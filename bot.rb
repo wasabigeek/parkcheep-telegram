@@ -1,4 +1,5 @@
 require 'telegram/bot'
+require 'parkcheep'
 
 class NullState
   def initialize(bot)
@@ -27,7 +28,29 @@ class SearchState
   def handle(message)
     if @search_query.nil?
       @search_query = message.text
-      @bot.api.send_message(chat_id: message.chat.id, text: "Searching for carparks near #{@search_query}")
+      @bot.api.send_message(chat_id: message.chat.id, text: "Searching for carparks near \"#{@search_query}\"...")
+      locations = Parkcheep::Geocoder.new.geocode(@search_query)
+      if locations.empty?
+        @bot.api.send_message(chat_id: message.chat.id, text: "No carparks found.")
+        return
+      end
+
+      location_results = []
+      locations.each_with_index { |location, index| location_results << [index, location.dig(:raw_data, "ADDRESS")] }
+      if location_results.size > 1
+        @bot.api.send_message(chat_id: message.chat.id, text: "Found these locations matching #{@search_query}:")
+        location_results.each do |result|
+          @bot.api.send_message(chat_id: message.chat.id, text: "#{result[0]}: #{result[1]}")
+        end
+
+        # puts "Enter the number nearest to your destination. We'll search for carparks nearby:"
+        # print "> "
+        # location_index = gets.chomp.to_i
+        # location = locations[location_index]
+      else
+        location = locations.first
+        @bot.api.send_message(chat_id: message.chat.id, text: "Found this location: #{location_results.first[1]}")
+      end
     end
   end
 end
