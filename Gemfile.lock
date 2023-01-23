@@ -1,14 +1,16 @@
 GIT
   remote: https://github.com/wasabigeek/parkcheep-prototype.git
-  revision: 3a97e6be4ebe14102ad69dcd21ee37c3ec03b54b
+  revision: 464bc47efefef290498eab6b278643431e33265e
+  branch: main
   specs:
     parkcheep (0.1.0)
       activesupport (~> 7.0)
+      httparty
 
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (7.0.4)
+    activesupport (7.0.4.1)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
@@ -29,10 +31,15 @@ GEM
     faraday-multipart (1.0.4)
       multipart-post (~> 2)
     faraday-net_http (3.0.2)
+    httparty (0.21.0)
+      mini_mime (>= 1.0.0)
+      multi_xml (>= 0.5.2)
     i18n (1.12.0)
       concurrent-ruby (~> 1.0)
     ice_nine (0.11.2)
+    mini_mime (1.1.2)
     minitest (5.17.0)
+    multi_xml (0.6.0)
     multipart-post (2.2.3)
     ruby2_keywords (0.0.5)
     telegram-bot-ruby (0.23.0)
