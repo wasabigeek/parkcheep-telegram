@@ -1,4 +1,5 @@
 require 'telegram/bot'
+require 'active_support/time'
 require 'parkcheep'
 
 class BaseState
@@ -33,27 +34,27 @@ class SearchState < BaseState
   def handle(message)
     if @search_query.nil?
       @search_query = message.text
-      @bot.api.send_message(chat_id: message.chat.id, text: "Searching for carparks near \"#{@search_query}\"...")
+      @bot.api.send_message(chat_id: message.chat.id, text: "Searching for \"#{@search_query}\"...")
       @location_results = []
       @location_results = Parkcheep::Geocoder.new.geocode(@search_query)
       if @location_results.empty?
-        @bot.api.send_message(chat_id: message.chat.id, text: "No carparks found.")
+        @bot.api.send_message(chat_id: message.chat.id, text: "No locations found.")
         return
       end
 
       locations = []
       @location_results.each_with_index { |location, index| locations << [index, location.dig(:raw_data, "ADDRESS")] }
-      if locations.size > 1
+      # if locations.size > 1
         kb = locations.map do |result|
           Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{result[1]}", callback_data: result[0].to_s)
         end
         markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
         @bot.api.send_message(chat_id: message.chat.id, text: "Choose the location that matches your search:", reply_markup: markup)
-      elsif locations.size == 1
-        location = locations.first
-        @bot.api.send_message(chat_id: message.chat.id, text: "Found this location: #{locations.first[1]}")
-        # send a callback?
-      end
+      # elsif locations.size == 1
+      #   location = locations.first
+      #   @bot.api.send_message(chat_id: message.chat.id, text: "Found this location: #{locations.first[1]}")
+      #   # send a callback?
+      # end
     end
   end
 
@@ -65,20 +66,13 @@ class SearchState < BaseState
 
     start_time = Time.current
     end_time = Time.current + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
-    @bot.api.send_message(chat_id: callback_query.from.id, text: "Found these carparks and rates for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
+    @bot.api.send_message(chat_id: callback_query.from.id, text: "Found #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
     carpark_results.each do |result|
       parking_rate_text = result.carpark.cost_text(start_time, end_time)
-      estimated_cost_text = nil
-      unless parking_rate_text.include?("same as")
-        begin
-          estimated_cost_text "- Estimated Cost: $#{result.carpark.cost(start_time,
-                                                        end_time).truncate(2)} (for #{options[:duration]} hours)"
-        rescue StandardError
-        end
-      end
+      estimated_cost_text = "- Estimated Cost: $#{result.carpark.cost(start_time, end_time).truncate(2)}"
       @bot.api.send_message(
         chat_id: callback_query.from.id,
-        text: "#{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km\n- Parking Rates: #{parking_rate_text}\n- Estimated Cost: #{estimated_cost_text}"
+        text: "#{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km\n- Estimated Cost: #{estimated_cost_text}\n- Parking Rates: #{parking_rate_text}"
       )
     end
   end
@@ -92,6 +86,11 @@ class Bot
   end
 
   def run
+    puts "Preloading Parkcheep..."
+    Time.zone = "Asia/Singapore"
+    Parkcheep.preload
+    puts "Preloaded Parkcheep!"
+
     Telegram::Bot::Client.run(@token) do |bot|
       @state = BaseState.new(bot)
       bot.api.set_my_commands(commands: [
