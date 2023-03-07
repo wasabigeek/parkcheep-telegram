@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/wasabigeek/parkcheep-prototype.git
-  revision: b011ee06de54a5e611602009c910b065cfc9e760
+  revision: b6b172a2c2e06f6272ad1f8eec45ddc29e4c6505
   branch: main
   specs:
     parkcheep (0.1.0)
@@ -21,7 +21,7 @@ GEM
       thread_safe (~> 0.3, >= 0.3.1)
     coercible (1.0.0)
       descendants_tracker (~> 0.0.1)
-    concurrent-ruby (1.2.0)
+    concurrent-ruby (1.2.2)
     descendants_tracker (0.0.4)
       thread_safe (~> 0.3, >= 0.3.1)
     dry-inflector (1.0.0)
@@ -38,7 +38,7 @@ GEM
       concurrent-ruby (~> 1.0)
     ice_nine (0.11.2)
     mini_mime (1.1.2)
-    minitest (5.17.0)
+    minitest (5.18.0)
     multi_xml (0.6.0)
     multipart-post (2.2.3)
     ruby2_keywords (0.0.5)
