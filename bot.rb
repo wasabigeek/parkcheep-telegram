@@ -43,7 +43,7 @@ class SearchState < BaseState
       end
 
       locations = []
-      @location_results.each_with_index { |location, index| locations << [index, location.dig(:raw_data, "ADDRESS")] }
+      @location_results.each_with_index { |location, index| locations << [index, location.address] }
       # if locations.size > 1
         kb = locations.map do |result|
           Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{result[1]}", callback_data: result[0].to_s)
