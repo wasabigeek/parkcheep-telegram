@@ -79,9 +79,11 @@ class SearchState < BaseState
       coord = result.carpark.coordinate_group
       text += "\n- [Google Maps](https://www.google.com/maps/dir/?api=1&destination=#{[coord.latitude, coord.longitude].join(",")})"
 
-      # naively escape Telegram markdown reserved characters
-      text.gsub!("-", "\\-")
-      text.gsub!(".", "\\.")
+      # naively escape Telegram markdown reserved characters https://core.telegram.org/bots/api#formatting-options
+      # assumes []() are inline links
+      text.gsub!(/(\_|\*|\~|\`|\>|\#|\+|\-|\=|\||\{|\}|\.|\!)/) { |match| "\\#{match}" }
+
+      puts text
 
       @bot.api.send_message(
         chat_id: callback_query.from.id,
