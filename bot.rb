@@ -77,11 +77,12 @@ class SearchState < BaseState
       text += "\n- Parking Rates: #{parking_rate_text}" if parking_rate_text.present?
 
       coord = result.carpark.coordinate_group
-      text += "\n- [Google Maps](https://www.google.com/maps/dir/?api=1&destination=#{[coord.latitude, coord.longitude].join(",")})"
+      # $gmaps$ is a workaround to not escape inline url
+      text += "\n- $gmaps$https://www.google.com/maps/dir/?api=1&destination=#{[coord.latitude, coord.longitude].join(",")}$gmaps$"
 
-      # naively escape Telegram markdown reserved characters https://core.telegram.org/bots/api#formatting-options
-      # assumes []() are inline links
-      text.gsub!(/(\_|\*|\~|\`|\>|\#|\+|\-|\=|\||\{|\}|\.|\!)/) { |match| "\\#{match}" }
+      # escape Telegram markdown reserved characters https://core.telegram.org/bots/api#formatting-options
+      text.gsub!(/(\_|\*|\~|\`|\>|\#|\+|\-|\=|\||\{|\}|\.|\!|\[|\]|\(|\))/) { |match| "\\#{match}" }
+      text.gsub!(/\$gmaps\$(\S+)\$gmaps\$/, "[Google Maps](\\1)")
 
       puts text
 
