@@ -70,14 +70,23 @@ class SearchState < BaseState
     carpark_results.each do |result|
       estimated_cost = result.carpark.cost(start_time, end_time)
       estimated_cost_text = estimated_cost.nil? ? "N/A" : "$#{result.carpark.cost(start_time, end_time).truncate(2)}"
-      text = "#{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km\n- Estimated Cost: #{estimated_cost_text}"
+      text = "#{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km"
+      text += "\n- Estimated Cost: #{estimated_cost_text}"
 
       parking_rate_text = result.carpark.cost_text(start_time, end_time)
       text += "\n- Parking Rates: #{parking_rate_text}" if parking_rate_text.present?
 
+      coord = result.carpark.coordinate_group
+      text += "\n- [Google Maps](https://www.google.com/maps/dir/?api=1&destination=#{[coord.latitude, coord.longitude].join(",")})"
+
+      # naively escape Telegram markdown reserved characters
+      text.gsub!("-", "\\-")
+      text.gsub!(".", "\\.")
+
       @bot.api.send_message(
         chat_id: callback_query.from.id,
-        text:
+        text:,
+        parse_mode: "MarkdownV2",
       )
     end
   end
@@ -103,9 +112,9 @@ class Bot
       ])
 
       bot.listen do |message|
-        puts message.class
         case message
         when Telegram::Bot::Types::Message
+          puts "#{message.class}"
           case message.text
           when "/start"
             @state = SearchState.new(bot)
@@ -117,6 +126,7 @@ class Bot
             @state.handle(message)
           end
         when Telegram::Bot::Types::CallbackQuery
+          puts "CallbackQuery ID #{message.from.id}: #{message.data}"
           @state.handle_callback(message)
         end
       end
