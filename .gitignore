@@ -4,3 +4,4 @@ deploy.sh
 terraform/.terraform*
 deploy/telegrambot.env
 deploy/telegrambot.service
+log/capistrano.log
