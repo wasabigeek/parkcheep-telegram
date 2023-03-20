@@ -1,0 +1,17 @@
+# telegrambot.service
+[Unit]
+Description=Telegram Bot
+
+[Service]
+User=nick
+Group=nick
+WorkingDirectory=~/parkcheep-telegram
+Restart=always
+ExecStart=~/.rvm/bin/rvm 3.1.3 do bundle exec ruby bot.rb
+StandardError=journal
+StandardOutput=journal
+StandardInput=null
+EnvironmentFile=~/telegrambot.env
+
+[Install]
+WantedBy=multi-user.target

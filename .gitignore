@@ -1,4 +1,4 @@
-telegram_token.txt
+telegram_token*.txt
 terraform/parkcheep-gcp.json
 deploy.sh
 terraform/.terraform*
