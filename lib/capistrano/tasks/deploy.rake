@@ -8,6 +8,9 @@ namespace :deploy do
 
   task :published do
     on roles(:bot) do
+      within('/var/www/parkcheep-telegram/current') do
+        execute "/home/nick/.rvm/bin/rvm", "3.1.3", "do", "bundle", "install"
+      end
       execute :sudo, "cp", "/var/www/parkcheep-telegram/shared/telegrambot.service", "/lib/systemd/system", "-v"
       execute :sudo, "systemctl", "daemon-reload"
       execute :sudo, "systemctl", "restart", "telegrambot.service"
