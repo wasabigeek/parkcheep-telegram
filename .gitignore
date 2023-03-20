@@ -2,3 +2,5 @@ telegram_token*.txt
 terraform/parkcheep-gcp.json
 deploy.sh
 terraform/.terraform*
+deploy/telegrambot.env
+deploy/telegrambot.service

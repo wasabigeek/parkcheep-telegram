@@ -98,7 +98,7 @@ end
 
 class Bot
   def initialize
-    @token = File.read("telegram_token.txt").strip
+    @token = ENV["TELEGRAM_TOKEN"] || File.read("telegram_token.txt").strip
     @state = nil
   end
 
