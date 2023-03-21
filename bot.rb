@@ -44,9 +44,17 @@ class SearchState < BaseState
 
       locations = []
       @location_results.each_with_index { |location, index| locations << [index, location[:address]] }
+
+      # TODO: fix to work with multiple locations
+      center_location = @location_results.first
+      center_lat_lng = [center_location[:coordinate_group].latitude, center_location[:coordinate_group].longitude].join(",")
+      @bot.api.send_photo(
+        chat_id: message.chat.id,
+        photo: "https://maps.googleapis.com/maps/api/staticmap?center=#{center_lat_lng}&zoom=17&size=400x400&markers=label:A|#{center_lat_lng}&key=#{ENV["GOOGLE_MAPS_API_KEY"]}" # &signature=#{}
+      )
       # if locations.size > 1
         kb = locations.map do |result|
-          Telegram::Bot::Types::InlineKeyboardButton.new(text: "#{result[1]}", callback_data: result[0].to_s)
+          Telegram::Bot::Types::InlineKeyboardButton.new(text: "A: #{result[1]}", callback_data: result[0].to_s)
         end
         markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
         @bot.api.send_message(chat_id: message.chat.id, text: "Choose the location that matches your search:", reply_markup: markup)
@@ -83,8 +91,6 @@ class SearchState < BaseState
       # escape Telegram markdown reserved characters https://core.telegram.org/bots/api#formatting-options
       text.gsub!(/(\_|\*|\~|\`|\>|\#|\+|\-|\=|\||\{|\}|\.|\!|\[|\]|\(|\))/) { |match| "\\#{match}" }
       text.gsub!(/\$gmaps\$(\S+)\$gmaps\$/, "[Google Maps](\\1)")
-
-      puts text
 
       @bot.api.send_message(
         chat_id: callback_query.from.id,
