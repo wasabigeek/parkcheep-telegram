@@ -65,7 +65,7 @@ class SearchState < BaseState
     end.first(5)
 
     start_time = Time.current
-    end_time = Time.current + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
+    end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
     @bot.api.send_message(chat_id: callback_query.from.id, text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
     carpark_results.each do |result|
       estimated_cost = result.carpark.cost(start_time, end_time)
