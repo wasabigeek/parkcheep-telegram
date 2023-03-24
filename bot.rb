@@ -88,7 +88,7 @@ class SearchState < BaseState
 
     start_time = Time.current
     end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
-    @bot.api.send_message(chat_id: callback_query.from.id, text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
+    @bot.api.send_message(chat_id: callback_query.message.chat.id, text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
     carpark_results.each do |result|
       estimated_cost = result.carpark.cost(start_time, end_time)
       estimated_cost_text = estimated_cost.nil? ? "N/A" : "$#{result.carpark.cost(start_time, end_time).truncate(2)}"
@@ -115,6 +115,14 @@ class SearchState < BaseState
 
     @next_state = self
   end
+
+  # class ShowCarparksState < BaseState
+  #   def initialize(bot, context: {}.with_indifferent_access)
+  #     @location = context[:location]
+
+  #     super
+  #   end
+  # end
 
   private
 
@@ -164,7 +172,7 @@ class Bot
             @state = @state.next_state
           end
         when Telegram::Bot::Types::CallbackQuery
-          puts "CallbackQuery ID #{message.from.id}: #{message.data}"
+          puts "CallbackQuery ID #{message.id}: #{message.data}"
           @state.handle_callback(message)
           @state = @state.next_state
         end
