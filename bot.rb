@@ -82,7 +82,7 @@ class SearchState < BaseState
 
   def handle_callback(callback_query)
     location = @location_results[callback_query.data.to_i]
-    @next_state = ShowCarparksState.enter(@bot, chat: @chat, destination: location[:coordinate_group])
+    @next_state = SelectTimeState.enter(@bot, chat: @chat, destination: location[:coordinate_group])
   end
 
   def welcome
@@ -92,10 +92,26 @@ class SearchState < BaseState
   end
 end
 
+class SelectTimeState < BaseState
+  def initialize(bot, **kwargs)
+    @destination = kwargs[:destination]
+
+    super
+  end
+
+  def welcome
+    start_time = Time.current
+    end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
+    @next_state = ShowCarparksState.enter(@bot, chat: @chat, destination: @destination, start_time: start_time, end_time: end_time)
+  end
+end
+
 
 class ShowCarparksState < BaseState
   def initialize(bot, **kwargs)
     @destination = kwargs[:destination]
+    @start_time = kwargs[:start_time]
+    @end_time = kwargs[:end_time]
 
     super
   end
@@ -105,12 +121,13 @@ class ShowCarparksState < BaseState
       carpark_result.distance_from_destination < 1
     end.first(5)
 
-    start_time = Time.current
-    end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
-    @bot.api.send_message(chat_id: @chat.id, text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
+    @bot.api.send_message(
+      chat_id: @chat.id,
+      text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:"
+    )
     carpark_results.each do |result|
       estimated_cost = result.carpark.cost(start_time, end_time)
-      estimated_cost_text = estimated_cost.nil? ? "N/A" : "$#{result.carpark.cost(start_time, end_time).truncate(2)}"
+      estimated_cost_text = estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)}"
       text = "#{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km"
       text += "\n- Estimated Cost: #{estimated_cost_text}"
 
@@ -132,6 +149,10 @@ class ShowCarparksState < BaseState
       )
     end
   end
+
+  private
+
+  attr_reader :start_time, :end_time
 end
 
 class Bot
