@@ -1,34 +1,46 @@
 require 'telegram/bot'
+require 'active_support/hash_with_indifferent_access'
 require 'active_support/time'
 require 'parkcheep'
 
 class BaseState
-  def initialize(bot)
-    @bot = bot
-  end
+  attr_reader :next_state
 
-  def welcome(message)
-    @bot.api.send_message(chat_id: message.chat.id, text: "Hello, #{message.from.first_name}")
+  def initialize(bot, context: {}.with_indifferent_access)
+    @bot = bot
+    @next_state = self
+    @chat = context[:chat]
+
+    welcome
   end
 
   def handle(message)
     @bot.api.send_message(chat_id: message.chat.id, text: "Message received, #{message.text}")
+
+    @next_state = self
   end
 
   def handle_callback(callback_query)
     @bot.api.send_message(chat_id: callback_query.from.id, text: "Callback received, data: #{callback_query.data}")
+
+    @next_state = self
+  end
+
+  private
+
+  def welcome
+    return unless @chat.present?
+
+    @bot.api.send_message(chat_id: @chat.id, text: "Hello, welcome to the Parkcheep Bot! Type /start to begin.")
   end
 end
 
 class SearchState < BaseState
-  def initialize(bot)
-    @bot = bot
+  def initialize(bot, context: {}.with_indifferent_access)
     @search_query = nil
     @location_results = []
-  end
 
-  def welcome(message)
-    @bot.api.send_message(chat_id: message.chat.id, text: "Hi #{message.from.first_name}, please enter a location to search for.")
+    super
   end
 
   def handle(message)
@@ -64,6 +76,8 @@ class SearchState < BaseState
       #   # send a callback?
       # end
     end
+
+    @next_state = self
   end
 
   def handle_callback(callback_query)
@@ -98,6 +112,16 @@ class SearchState < BaseState
         parse_mode: "MarkdownV2",
       )
     end
+
+    @next_state = self
+  end
+
+  private
+
+  def welcome
+    return unless @chat.present?
+
+    @bot.api.send_message(chat_id: @chat.id, text: "Please enter a location to search for.")
   end
 end
 
@@ -126,17 +150,23 @@ class Bot
           puts "#{message.class}"
           case message.text
           when "/start"
-            @state = SearchState.new(bot)
-            @state.welcome(message)
+            @state = SearchState.new(
+              bot,
+              context: {chat: message.chat}.with_indifferent_access
+            )
           when "/stop"
-            @state = BaseState.new(bot)
-            @state.welcome(message)
+            @state = BaseState.new(
+              bot,
+              context: {chat: message.chat}.with_indifferent_access
+            )
           else
             @state.handle(message)
+            @state = @state.next_state
           end
         when Telegram::Bot::Types::CallbackQuery
           puts "CallbackQuery ID #{message.from.id}: #{message.data}"
           @state.handle_callback(message)
+          @state = @state.next_state
         end
       end
     end
