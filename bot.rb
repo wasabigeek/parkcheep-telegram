@@ -95,15 +95,43 @@ end
 class SelectTimeState < BaseState
   def initialize(bot, **kwargs)
     @destination = kwargs[:destination]
+    @start_time = Time.current
+    @end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
 
     super
   end
 
   def welcome
-    start_time = Time.current
-    end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
-    @next_state = ShowCarparksState.enter(@bot, chat: @chat, destination: @destination, start_time: start_time, end_time: end_time)
+    kb = [
+      Telegram::Bot::Types::InlineKeyboardButton.new(text: "Yes", callback_data: "yes"),
+      Telegram::Bot::Types::InlineKeyboardButton.new(text: "No", callback_data: "no")
+    ]
+    markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+    @bot.api.send_message(chat_id: @chat.id, text: "Time period is set to #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}, is this correct?", reply_markup: markup)
   end
+
+  def handle_callback(callback_query)
+    if callback_query.data == "yes"
+      @next_state = ShowCarparksState.enter(@bot, chat: @chat, destination: @destination, start_time: @start_time, end_time: @end_time)
+    else
+      @bot.api.send_message(chat_id: @chat.id, text: "Please enter a start time in HH:MM format (e.g. 13:15).")
+    end
+  end
+
+  def handle(message)
+    begin
+      @start_time = Time.parse(message.text)
+      @end_time = start_time + 1.hour
+      welcome
+    rescue ArgumentError => e
+      puts e
+      @bot.api.send_message(chat_id: message.chat.id, text: "Could not parse \"#{message.text}\", please try again in HH:MM format.")
+    end
+  end
+
+  private
+
+  attr_reader :start_time, :end_time
 end
 
 
