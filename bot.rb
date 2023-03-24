@@ -6,12 +6,14 @@ require 'parkcheep'
 class BaseState
   attr_reader :next_state
 
-  def initialize(bot, context: {}.with_indifferent_access)
+  def self.enter(bot, **kwargs)
+    new(bot, **kwargs).tap { |state| state.welcome }
+  end
+
+  def initialize(bot, **kwargs)
     @bot = bot
     @next_state = self
-    @chat = context[:chat]
-
-    welcome
+    @chat = kwargs[:chat]
   end
 
   def handle(message)
@@ -26,8 +28,6 @@ class BaseState
     @next_state = self
   end
 
-  private
-
   def welcome
     return unless @chat.present?
 
@@ -36,7 +36,7 @@ class BaseState
 end
 
 class SearchState < BaseState
-  def initialize(bot, context: {}.with_indifferent_access)
+  def initialize(bot, **kwargs)
     @search_query = nil
     @location_results = []
 
@@ -82,13 +82,32 @@ class SearchState < BaseState
 
   def handle_callback(callback_query)
     location = @location_results[callback_query.data.to_i]
-    carpark_results = Parkcheep::Carpark.search(destination: location[:coordinate_group]) do |carpark_result|
+    @next_state = ShowCarparksState.enter(@bot, chat: @chat, destination: location[:coordinate_group])
+  end
+
+  def welcome
+    return unless @chat.present?
+
+    @bot.api.send_message(chat_id: @chat.id, text: "Please enter a location to search for.")
+  end
+end
+
+
+class ShowCarparksState < BaseState
+  def initialize(bot, **kwargs)
+    @destination = kwargs[:destination]
+
+    super
+  end
+
+  def welcome
+    carpark_results = Parkcheep::Carpark.search(destination: @destination) do |carpark_result|
       carpark_result.distance_from_destination < 1
     end.first(5)
 
     start_time = Time.current
     end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
-    @bot.api.send_message(chat_id: callback_query.message.chat.id, text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
+    @bot.api.send_message(chat_id: @chat.id, text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:")
     carpark_results.each do |result|
       estimated_cost = result.carpark.cost(start_time, end_time)
       estimated_cost_text = estimated_cost.nil? ? "N/A" : "$#{result.carpark.cost(start_time, end_time).truncate(2)}"
@@ -107,32 +126,13 @@ class SearchState < BaseState
       text.gsub!(/\$gmaps\$(\S+)\$gmaps\$/, "[Google Maps](\\1)")
 
       @bot.api.send_message(
-        chat_id: callback_query.from.id,
+        chat_id: @chat.id,
         text:,
         parse_mode: "MarkdownV2",
       )
     end
-
-    @next_state = self
-  end
-
-  # class ShowCarparksState < BaseState
-  #   def initialize(bot, context: {}.with_indifferent_access)
-  #     @location = context[:location]
-
-  #     super
-  #   end
-  # end
-
-  private
-
-  def welcome
-    return unless @chat.present?
-
-    @bot.api.send_message(chat_id: @chat.id, text: "Please enter a location to search for.")
   end
 end
-
 
 class Bot
   def initialize
@@ -158,14 +158,14 @@ class Bot
           puts "#{message.class}"
           case message.text
           when "/start"
-            @state = SearchState.new(
+            @state = SearchState.enter(
               bot,
-              context: {chat: message.chat}.with_indifferent_access
+              chat: message.chat
             )
           when "/stop"
-            @state = BaseState.new(
+            @state = BaseState.enter(
               bot,
-              context: {chat: message.chat}.with_indifferent_access
+              chat: message.chat
             )
           else
             @state.handle(message)
