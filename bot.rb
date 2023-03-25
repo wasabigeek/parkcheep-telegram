@@ -13,7 +13,7 @@ class BaseState
   def initialize(bot, **kwargs)
     @bot = bot
     @next_state = self
-    @chat = kwargs[:chat]
+    @chat_id = kwargs[:chat_id]
   end
 
   def handle(message)
@@ -29,9 +29,9 @@ class BaseState
   end
 
   def welcome
-    return unless @chat.present?
+    return unless @chat_id.present?
 
-    @bot.api.send_message(chat_id: @chat.id, text: "Hello, welcome to the Parkcheep Bot! Type /start to begin.")
+    @bot.api.send_message(chat_id: @chat_id, text: "Hello, welcome to the Parkcheep Bot! Type /start to begin.")
   end
 end
 
@@ -82,13 +82,13 @@ class SearchState < BaseState
 
   def handle_callback(callback_query)
     location = @location_results[callback_query.data.to_i]
-    @next_state = SelectTimeState.enter(@bot, chat: @chat, destination: location[:coordinate_group])
+    @next_state = SelectTimeState.enter(@bot, chat_id: @chat_id, destination: location[:coordinate_group])
   end
 
   def welcome
-    return unless @chat.present?
+    return unless @chat_id.present?
 
-    @bot.api.send_message(chat_id: @chat.id, text: "Please enter a location to search for.")
+    @bot.api.send_message(chat_id: @chat_id, text: "Please enter a location to search for.")
   end
 end
 
@@ -107,14 +107,14 @@ class SelectTimeState < BaseState
       Telegram::Bot::Types::InlineKeyboardButton.new(text: "No", callback_data: "no")
     ]
     markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-    @bot.api.send_message(chat_id: @chat.id, text: "Time period is set to #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}, is this correct?", reply_markup: markup)
+    @bot.api.send_message(chat_id: @chat_id, text: "Time period is set to #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}, is this correct?", reply_markup: markup)
   end
 
   def handle_callback(callback_query)
     if callback_query.data == "yes"
-      @next_state = ShowCarparksState.enter(@bot, chat: @chat, destination: @destination, start_time: @start_time, end_time: @end_time)
+      @next_state = ShowCarparksState.enter(@bot, chat_id: @chat_id, destination: @destination, start_time: @start_time, end_time: @end_time)
     else
-      @bot.api.send_message(chat_id: @chat.id, text: "Please enter a start time in HH:MM format (e.g. 13:15).")
+      @bot.api.send_message(chat_id: @chat_id, text: "Please enter a start time in HH:MM format (e.g. 13:15).")
     end
   end
 
@@ -150,7 +150,7 @@ class ShowCarparksState < BaseState
     end.first(5)
 
     @bot.api.send_message(
-      chat_id: @chat.id,
+      chat_id: @chat_id,
       text: "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:"
     )
     carpark_results.each do |result|
@@ -171,7 +171,7 @@ class ShowCarparksState < BaseState
       text.gsub!(/\$gmaps\$(\S+)\$gmaps\$/, "[Google Maps](\\1)")
 
       @bot.api.send_message(
-        chat_id: @chat.id,
+        chat_id: @chat_id,
         text:,
         parse_mode: "MarkdownV2",
       )
@@ -216,14 +216,14 @@ class Bot
             # state = SearchState.enter(
             @state = SearchState.enter(
               bot,
-              chat: message.chat
+              chat_id: message.chat.id
             )
             # @chat_state_store[message.chat.id] = state.serialize
           when "/stop"
             # state = BaseState.enter(
             @state = BaseState.enter(
               bot,
-              chat: message.chat
+              chat_id: message.chat.id
             )
             # @chat_state_store[message.chat.id] = state.serialize
           else
