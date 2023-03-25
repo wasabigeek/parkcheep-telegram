@@ -187,6 +187,12 @@ class Bot
   def initialize
     @token = ENV["TELEGRAM_TOKEN"] || File.read("telegram_token.txt").strip
     @state = nil
+    @chat_state_store = Hash.new do |_, k|
+      {
+        chat_id: k,
+        state: BaseState.to_s,
+      }
+    end
   end
 
   def run
@@ -207,16 +213,26 @@ class Bot
           puts "#{message.class}"
           case message.text
           when "/start"
+            # state = SearchState.enter(
             @state = SearchState.enter(
               bot,
               chat: message.chat
             )
+            # @chat_state_store[message.chat.id] = state.serialize
           when "/stop"
+            # state = BaseState.enter(
             @state = BaseState.enter(
               bot,
               chat: message.chat
             )
+            # @chat_state_store[message.chat.id] = state.serialize
           else
+            # data = @chat_state_store[message.chat.id]
+            # state_class = data.delete(:state).constantize
+            # state = state_class.deserialize(bot, **data)
+            # state.handle(message)
+            # @chat_state_store[message.chat.id] = state.next_state.serialize
+
             @state.handle(message)
             @state = @state.next_state
           end
