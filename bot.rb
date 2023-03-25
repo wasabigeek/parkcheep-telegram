@@ -28,6 +28,13 @@ class BaseState
     @next_state = self
   end
 
+  def to_data
+    {
+      state: self.class.name,
+      chat_id: @chat_id,
+    }
+  end
+
   def welcome
     return unless @chat_id.present?
 
@@ -85,6 +92,15 @@ class SearchState < BaseState
     @next_state = SelectTimeState.enter(@bot, chat_id: @chat_id, destination: location[:coordinate_group])
   end
 
+  def to_data
+    {
+      state: self.class.name,
+      chat_id: @chat_id,
+      search_query: @search_query,
+      location_results: @location_results,
+    }
+  end
+
   def welcome
     return unless @chat_id.present?
 
@@ -127,6 +143,16 @@ class SelectTimeState < BaseState
       puts e
       @bot.api.send_message(chat_id: message.chat.id, text: "Could not parse \"#{message.text}\", please try again in HH:MM format.")
     end
+  end
+
+  def to_data
+    {
+      state: self.class.name,
+      chat_id: @chat_id,
+      destination: @destination,
+      start_time:,
+      end_time:,
+    }
   end
 
   private
@@ -178,6 +204,16 @@ class ShowCarparksState < BaseState
     end
   end
 
+  def to_data
+    {
+      state: self.class.name,
+      chat_id: @chat_id,
+      destination: @destination,
+      start_time:,
+      end_time:,
+    }
+  end
+
   private
 
   attr_reader :start_time, :end_time
@@ -213,34 +249,38 @@ class Bot
           puts "#{message.class}"
           case message.text
           when "/start"
-            # state = SearchState.enter(
-            @state = SearchState.enter(
+            state = SearchState.enter(
               bot,
               chat_id: message.chat.id
             )
-            # @chat_state_store[message.chat.id] = state.serialize
+            @state = state
+            @chat_state_store[message.chat.id] = state.to_data
           when "/stop"
-            # state = BaseState.enter(
-            @state = BaseState.enter(
+            state = BaseState.enter(
               bot,
               chat_id: message.chat.id
             )
-            # @chat_state_store[message.chat.id] = state.serialize
+            @state = state
+            @chat_state_store[message.chat.id] = state.to_data
           else
             # data = @chat_state_store[message.chat.id]
             # state_class = data.delete(:state).constantize
-            # state = state_class.deserialize(bot, **data)
-            # state.handle(message)
-            # @chat_state_store[message.chat.id] = state.next_state.serialize
+            # state = state_class.init_from_data(bot, data:)
+            state = @state
+            state.handle(message)
+            @state = state.next_state
 
-            @state.handle(message)
-            @state = @state.next_state
+            @chat_state_store[message.chat.id] = @state.next_state.to_data
           end
         when Telegram::Bot::Types::CallbackQuery
           puts "CallbackQuery ID #{message.id}: #{message.data}"
           @state.handle_callback(message)
           @state = @state.next_state
+          @chat_state_store[message.from.id] = @state.next_state.to_data
         end
+
+        # TODO: remove
+        puts @chat_state_store
       end
     end
   end
