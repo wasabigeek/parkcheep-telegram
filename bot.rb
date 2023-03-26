@@ -120,7 +120,7 @@ class SelectTimeState < BaseState
 
   def handle(message)
     begin
-      @start_time = Time.parse(message.text)
+      @start_time = Time.zone.parse(message.text)
       @end_time = start_time + 1.hour
       welcome
     rescue ArgumentError => e
