@@ -305,7 +305,7 @@ class ShowCarparksState < BaseState
       estimated_cost_text =
         estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)}"
       text =
-        "#{labels[index]}: #{result.name}*\n- Distance: #{result.distance_from_destination.truncate(2)} km"
+        "#{labels[index]}: #{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km"
       text += "\n- Estimated Cost: #{estimated_cost_text}"
 
       parking_rate_text = result.carpark.cost_text(start_time, end_time)
