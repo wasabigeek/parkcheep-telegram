@@ -51,6 +51,13 @@ class BaseState
       text: "Hello, welcome to the Parkcheep Bot! Type /start to begin."
     )
   end
+
+  # @param [Parkcheep::CoordinateGroup] destination
+  # @param [Array<Parkcheep::CoordinateGroup>] carparks
+  def gmaps_static_url(destination:, carparks: [])
+    center_lat_lng = [destination.latitude, destination.longitude].join(",")
+    "https://maps.googleapis.com/maps/api/staticmap?center=#{center_lat_lng}&zoom=17&size=400x400&markers=label:A|#{center_lat_lng}&key=#{ENV["GOOGLE_MAPS_API_KEY"]}" # &signature=#{}
+  end
 end
 
 class SearchState < BaseState
@@ -99,14 +106,9 @@ class SearchState < BaseState
 
       # TODO: fix to work with multiple locations
       center_location = @location_results.first
-      center_lat_lng = [
-        center_location[:coordinate_group].latitude,
-        center_location[:coordinate_group].longitude
-      ].join(",")
       @bot.api.send_photo(
         chat_id: message.chat.id,
-        photo:
-          "https://maps.googleapis.com/maps/api/staticmap?center=#{center_lat_lng}&zoom=17&size=400x400&markers=label:A|#{center_lat_lng}&key=#{ENV["GOOGLE_MAPS_API_KEY"]}" # &signature=#{}
+        photo: gmaps_static_url(destination: center_location[:coordinate_group])
       )
       # if locations.size > 1
       kb =
