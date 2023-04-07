@@ -53,10 +53,26 @@ class BaseState
   end
 
   # @param [Parkcheep::CoordinateGroup] destination
-  # @param [Array<Parkcheep::CoordinateGroup>] carparks
+  # @param [Array<Parkcheep::Carpark>] carparks
   def gmaps_static_url(destination:, carparks: [])
     center_lat_lng = [destination.latitude, destination.longitude].join(",")
-    "https://maps.googleapis.com/maps/api/staticmap?center=#{center_lat_lng}&zoom=17&size=400x400&markers=label:A|#{center_lat_lng}&key=#{ENV["GOOGLE_MAPS_API_KEY"]}" # &signature=#{}
+    url =
+      "https://maps.googleapis.com/maps/api/staticmap?key=" +
+        ENV["GOOGLE_MAPS_API_KEY"] # &signature=#{}
+    url += "&zoom=17&size=400x400"
+    # destination parameters
+    url += "&center=#{center_lat_lng}&markers=color:red|#{center_lat_lng}"
+    # carpark parameters
+    carpark_markers =
+      carparks.to_enum.with_index.map do |carpark, index|
+        labels = %w[A B C D E F G H I J]
+        coordinate_group = carpark.coordinate_group
+        "&markers=color:yellow|label:#{labels[index]}|#{coordinate_group.latitude},#{coordinate_group.longitude}"
+      end
+    url += carpark_markers.join if carpark_markers.any?
+    puts url
+
+    url
   end
 end
 
@@ -289,19 +305,29 @@ class ShowCarparksState < BaseState
     @bot.api.send_message(
       chat_id: @chat_id,
       text:
-        "Showing first #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:"
+        "Showing nearest #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:"
     )
-    carpark_results.each do |result|
+    @bot.api.send_photo(
+      chat_id: @chat_id,
+      photo:
+        gmaps_static_url(
+          destination: @destination,
+          carparks: carpark_results.map(&:carpark)
+        )
+    )
+    labels = %w[A B C D E F G H I J]
+    carpark_results.each_with_index do |result, index|
       estimated_cost = result.carpark.cost(start_time, end_time)
       estimated_cost_text =
         estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)}"
       text =
-        "#{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km"
+        "*#{labels[index]}: #{result.name}*\n- Distance: #{result.distance_from_destination.truncate(2)} km"
       text += "\n- Estimated Cost: #{estimated_cost_text}"
 
       parking_rate_text = result.carpark.cost_text(start_time, end_time)
       text +=
-        "\n- Parking Rates: #{parking_rate_text}" if parking_rate_text.present?
+        "\n- Raw Parking Rates: #{parking_rate_text}" if parking_rate_text.present? &&
+        estimated_cost.nil?
 
       coord = result.carpark.coordinate_group
       # $gmaps$ is a workaround to not escape inline url
@@ -312,7 +338,7 @@ class ShowCarparksState < BaseState
       text.gsub!(
         /(\_|\*|\~|\`|\>|\#|\+|\-|\=|\||\{|\}|\.|\!|\[|\]|\(|\))/
       ) { |match| "\\#{match}" }
-      text.gsub!(/\$gmaps\$(\S+)\$gmaps\$/, "[Google Maps](\\1)")
+      text.gsub!(/\$gmaps\$(\S+)\$gmaps\$/, "[Google Maps Directions](\\1)")
 
       @bot.api.send_message(chat_id: @chat_id, text:, parse_mode: "MarkdownV2")
     end
