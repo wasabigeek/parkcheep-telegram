@@ -222,7 +222,7 @@ class SelectTimeState < BaseState
     else
       @bot.api.send_message(
         chat_id: @chat_id,
-        text: "Please enter a start time in HH:MM format (e.g. 13:15)."
+        text: "Please enter a start time in `HH:MM` or `YYYY-MM-DD HH:MM` format (e.g. 13:15, or 2022-11-13 13:15). Changing the duration is not supported yet 🙇‍♂️."
       )
     end
   end
