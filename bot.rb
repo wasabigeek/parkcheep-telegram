@@ -163,7 +163,7 @@ class SearchState < BaseState
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "Please type your destination."
+      text: "👋 Hello! Please type your destination."
     )
   end
 end
@@ -202,7 +202,7 @@ class SelectTimeState < BaseState
     @bot.api.send_message(
       chat_id: @chat_id,
       text:
-        "Time period is set to #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}, is this correct?",
+        "The time period for parking is currently set to #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}, is this correct?",
       reply_markup: markup
     )
   end
