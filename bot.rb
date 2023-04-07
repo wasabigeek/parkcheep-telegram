@@ -49,9 +49,9 @@ class BaseState
     url =
       "https://maps.googleapis.com/maps/api/staticmap?key=" +
         ENV["GOOGLE_MAPS_API_KEY"] # &signature=#{}
-    url += "&zoom=17&size=400x400"
+    url += "&size=500x500"
     # destination parameters
-    url += "&center=#{center_lat_lng}&markers=color:red|#{center_lat_lng}"
+    url += "&markers=color:red|#{center_lat_lng}"
     # carpark parameters
     carpark_markers =
       carparks.to_enum.with_index.map do |carpark, index|
@@ -289,7 +289,7 @@ class ShowCarparksState < BaseState
     @bot.api.send_message(
       chat_id: @chat_id,
       text:
-        "Showing nearest #{carpark_results.size} carparks for #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}:"
+        "Showing nearest #{carpark_results.size} carparks in yellow 🟡:"
     )
     @bot.api.send_photo(
       chat_id: @chat_id,
