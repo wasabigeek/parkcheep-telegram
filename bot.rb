@@ -367,28 +367,40 @@ class BotRunner
       )
 
       bot.listen do |message|
-        case message
-        when Telegram::Bot::Types::Message
-          puts "#{message.class}"
+        chat_id = nil
+        begin
+          case message
+          when Telegram::Bot::Types::Message
+            puts "#{message.class}"
+            chat_id = message.chat.id
 
-          case message.text
-          when "/start"
-            state = SearchState.enter(bot, chat_id: message.chat.id)
-            store_chat_state(message.chat.id, state)
-          when "/stop"
-            state = BaseState.enter(bot, chat_id: message.chat.id)
-            store_chat_state(message.chat.id, state)
-          else
-            state = retrieve_chat_state(bot, message.chat.id)
-            state.handle(message)
-            store_chat_state(message.chat.id, state.next_state)
+            case message.text
+            when "/start"
+              state = SearchState.enter(bot, chat_id:)
+            when "/stop"
+              state = BaseState.enter(bot, chat_id:)
+            else
+              state = retrieve_chat_state(bot, chat_id)
+              state.handle(message)
+            end
+
+            store_chat_state(chat_id, state.next_state)
+          when Telegram::Bot::Types::CallbackQuery
+            chat_id = message.from.id
+
+            puts "CallbackQuery ID #{message.id}: #{message.data}"
+            state = retrieve_chat_state(bot, chat_id)
+            state.handle_callback(message)
+            store_chat_state(chat_id, state.next_state)
           end
-        when Telegram::Bot::Types::CallbackQuery
-          puts "CallbackQuery ID #{message.id}: #{message.data}"
-          chat_id = message.from.id
-          state = retrieve_chat_state(bot, chat_id)
-          state.handle_callback(message)
-          store_chat_state(chat_id, state.next_state)
+        rescue StandardError => e
+          bot.api.send_message(
+            chat_id: message.chat.id,
+            text:
+              "Oops! Seems like we had some issues. I'm going to reboot, sorry!"
+          )
+          puts @chat_state_store
+          raise
         end
 
         # TODO: remove
