@@ -22,20 +22,10 @@ class BaseState
   end
 
   def handle(message)
-    @bot.api.send_message(
-      chat_id: message.chat.id,
-      text: "Message received, #{message.text}"
-    )
-
     @next_state = self
   end
 
   def handle_callback(callback_query)
-    @bot.api.send_message(
-      chat_id: callback_query.from.id,
-      text: "Callback received, data: #{callback_query.data}"
-    )
-
     @next_state = self
   end
 
@@ -99,65 +89,59 @@ class SearchState < BaseState
   end
 
   def handle(message)
-    if @search_query.nil?
-      @search_query = message.text
+    @search_query = message.text
+    @bot.api.send_message(
+      chat_id: message.chat.id,
+      text: "Searching for \"#{@search_query}, Singapore\"..."
+    )
+    @location_results = []
+    @location_results = Parkcheep::Geocoder.new.geocode(@search_query)
+    if @location_results.empty?
       @bot.api.send_message(
         chat_id: message.chat.id,
-        text: "Searching for \"#{@search_query}\"..."
+        text: "No locations found."
       )
-      @location_results = []
-      @location_results = Parkcheep::Geocoder.new.geocode(@search_query)
-      if @location_results.empty?
-        @bot.api.send_message(
-          chat_id: message.chat.id,
-          text: "No locations found."
-        )
-        return
-      end
-
-      locations = []
-      @location_results.each_with_index do |location, index|
-        locations << [index, location[:address]]
-      end
-
-      # TODO: fix to work with multiple locations
-      center_location = @location_results.first
-      @bot.api.send_photo(
-        chat_id: message.chat.id,
-        photo: gmaps_static_url(destination: center_location[:coordinate_group])
-      )
-      # if locations.size > 1
-      kb =
-        locations.map do |result|
-          Telegram::Bot::Types::InlineKeyboardButton.new(
-            text: "A: #{result[1]}",
-            callback_data: result[0].to_s
-          )
-        end
-      markup =
-        Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-      @bot.api.send_message(
-        chat_id: message.chat.id,
-        text: "Choose the location that matches your search:",
-        reply_markup: markup
-      )
-      # elsif locations.size == 1
-      #   location = locations.first
-      #   @bot.api.send_message(chat_id: message.chat.id, text: "Found this location: #{locations.first[1]}")
-      #   # send a callback?
-      # end
+      return
     end
+
+    # TODO: handle Google maps returning multiple locations (rare)
+    center_location = @location_results.first
+    @bot.api.send_photo(
+      chat_id: message.chat.id,
+      photo: gmaps_static_url(destination: center_location[:coordinate_group])
+    )
+    kb = [
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "Yes",
+        callback_data: "true"
+      ),
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "No",
+        callback_data: "false"
+      )
+    ]
+    markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+
+    @bot.api.send_message(
+      chat_id: message.chat.id,
+      text: "Found this location: #{center_location[:address]}. Is it correct?",
+      reply_markup: markup
+    )
 
     @next_state = self
   end
 
   def handle_callback(callback_query)
-    location = @location_results[callback_query.data.to_i]
+    if callback_query.data == "false"
+      welcome
+      return
+    end
+
     @next_state =
       SelectTimeState.enter(
         @bot,
         chat_id: @chat_id,
-        destination: location[:coordinate_group]
+        destination: @location_results.first[:coordinate_group]
       )
   end
 
@@ -181,7 +165,7 @@ class SearchState < BaseState
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "Please enter a location to search for."
+      text: "Please type your destination."
     )
   end
 end
@@ -321,7 +305,7 @@ class ShowCarparksState < BaseState
       estimated_cost_text =
         estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)}"
       text =
-        "*#{labels[index]}: #{result.name}*\n- Distance: #{result.distance_from_destination.truncate(2)} km"
+        "#{labels[index]}: #{result.name}*\n- Distance: #{result.distance_from_destination.truncate(2)} km"
       text += "\n- Estimated Cost: #{estimated_cost_text}"
 
       parking_rate_text = result.carpark.cost_text(start_time, end_time)
