@@ -181,7 +181,7 @@ class SelectTimeState < BaseState
 
   def initialize(bot, **kwargs)
     @destination = kwargs[:destination]
-    @start_time = Time.current
+    @start_time = Time.current + 30.minutes
     @end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
 
     super
