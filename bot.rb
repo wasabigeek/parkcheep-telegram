@@ -11,8 +11,7 @@ class BaseState
   end
 
   def self.init_from_data(bot, **data)
-    state_class = data.delete(:state).constantize
-    state_class.new(bot, **data)
+    new(bot, **data)
   end
 
   def initialize(bot, **kwargs)
@@ -60,7 +59,6 @@ class BaseState
         "&markers=color:yellow|label:#{labels[index]}|#{coordinate_group.latitude},#{coordinate_group.longitude}"
       end
     url += carpark_markers.join if carpark_markers.any?
-    puts url
 
     url
   end
@@ -73,17 +71,17 @@ class SearchState < BaseState
       :location_results
     ].map do |result_hash|
       {
-        address: result[:address],
+        address: result_hash[:address],
         coordinate_group:
-          Parkcheep::CoordinateGroup.new(**result[:coordinate_group])
+          Parkcheep::CoordinateGroup.new(**result_hash[:coordinate_group])
       }
     end
     super(bot, **deserialized_data)
   end
 
   def initialize(bot, **kwargs)
-    @search_query = nil
-    @location_results = []
+    @search_query = kwargs[:search_query]
+    @location_results = kwargs[:location_results] || []
 
     super
   end
@@ -222,7 +220,8 @@ class SelectTimeState < BaseState
     else
       @bot.api.send_message(
         chat_id: @chat_id,
-        text: "Please enter a start time in `HH:MM` or `YYYY-MM-DD HH:MM` format (e.g. 13:15, or 2022-11-13 13:15). Changing the duration is not supported yet 🙇‍♂️."
+        text:
+          "Please enter a start time in `HH:MM` or `YYYY-MM-DD HH:MM` format (e.g. 13:15, or 2022-11-13 13:15). Changing the duration is not supported yet 🙇‍♂️."
       )
     end
   end
@@ -288,8 +287,7 @@ class ShowCarparksState < BaseState
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text:
-        "Showing nearest #{carpark_results.size} carparks in yellow 🟡:"
+      text: "Showing nearest #{carpark_results.size} carparks in yellow 🟡:"
     )
     @bot.api.send_photo(
       chat_id: @chat_id,
@@ -345,10 +343,9 @@ class ShowCarparksState < BaseState
   attr_reader :start_time, :end_time
 end
 
-class Bot
+class BotRunner
   def initialize
     @token = ENV["TELEGRAM_TOKEN"] || File.read("telegram_token.txt").strip
-    @state = nil
     @chat_state_store =
       Hash.new { |_, k| { chat_id: k, state: BaseState.to_s } }
   end
@@ -360,7 +357,6 @@ class Bot
     puts "Preloaded Parkcheep!"
 
     Telegram::Bot::Client.run(@token) do |bot|
-      @state = BaseState.new(bot)
       bot.api.set_my_commands(
         commands: [
           Telegram::Bot::Types::BotCommand.new(
@@ -374,29 +370,25 @@ class Bot
         case message
         when Telegram::Bot::Types::Message
           puts "#{message.class}"
+
           case message.text
           when "/start"
             state = SearchState.enter(bot, chat_id: message.chat.id)
-            @state = state
-            @chat_state_store[message.chat.id] = state.to_data
+            store_chat_state(message.chat.id, state)
           when "/stop"
             state = BaseState.enter(bot, chat_id: message.chat.id)
-            @state = state
-            @chat_state_store[message.chat.id] = state.to_data
+            store_chat_state(message.chat.id, state)
           else
-            # data = @chat_state_store[message.chat.id]
-            # state = state_class.init_from_data(bot, data:)
-            state = @state
+            state = retrieve_chat_state(bot, message.chat.id)
             state.handle(message)
-            @state = state.next_state
-
-            @chat_state_store[message.chat.id] = @state.next_state.to_data
+            store_chat_state(message.chat.id, state.next_state)
           end
         when Telegram::Bot::Types::CallbackQuery
           puts "CallbackQuery ID #{message.id}: #{message.data}"
-          @state.handle_callback(message)
-          @state = @state.next_state
-          @chat_state_store[message.from.id] = @state.next_state.to_data
+          chat_id = message.from.id
+          state = retrieve_chat_state(bot, chat_id)
+          state.handle_callback(message)
+          store_chat_state(chat_id, state.next_state)
         end
 
         # TODO: remove
@@ -404,6 +396,18 @@ class Bot
       end
     end
   end
+
+  private
+
+  def retrieve_chat_state(bot, chat_id)
+    data = @chat_state_store[chat_id]
+    state_class = data[:state].constantize
+    state_class.init_from_data(bot, **data)
+  end
+
+  def store_chat_state(chat_id, state)
+    @chat_state_store[chat_id] = state.to_data
+  end
 end
 
-Bot.new.run
+BotRunner.new.run
