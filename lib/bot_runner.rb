@@ -11,6 +11,43 @@ class BotRunner
       Hash.new { |_, k| { chat_id: k, state: BaseState.to_s } }
   end
 
+  def handle_message(bot, message)
+    chat_id = nil
+    begin
+      case message
+      when Telegram::Bot::Types::Message
+        puts "#{message.class}"
+        chat_id = message.chat.id
+
+        case message.text
+        when "/start"
+          state = SearchState.enter(bot, chat_id:)
+        when "/stop"
+          state = BaseState.enter(bot, chat_id:)
+        else
+          state = retrieve_chat_state(bot, chat_id)
+          state.handle(message)
+        end
+
+        store_chat_state(chat_id, state.next_state)
+      when Telegram::Bot::Types::CallbackQuery
+        chat_id = message.from.id
+
+        puts "CallbackQuery ID #{message.id}: #{message.data}"
+        state = retrieve_chat_state(bot, chat_id)
+        state.handle_callback(message)
+        store_chat_state(chat_id, state.next_state)
+      end
+    rescue StandardError => e
+      bot.api.send_message(
+        chat_id: message.chat.id,
+        text: "Oops! Seems like we had some issues. I'm going to reboot, sorry!"
+      )
+      puts @chat_state_store
+      raise
+    end
+  end
+
   def run
     puts "Preloading Parkcheep..."
     Time.zone = "Asia/Singapore"
@@ -28,41 +65,7 @@ class BotRunner
       )
 
       bot.listen do |message|
-        chat_id = nil
-        begin
-          case message
-          when Telegram::Bot::Types::Message
-            puts "#{message.class}"
-            chat_id = message.chat.id
-
-            case message.text
-            when "/start"
-              state = SearchState.enter(bot, chat_id:)
-            when "/stop"
-              state = BaseState.enter(bot, chat_id:)
-            else
-              state = retrieve_chat_state(bot, chat_id)
-              state.handle(message)
-            end
-
-            store_chat_state(chat_id, state.next_state)
-          when Telegram::Bot::Types::CallbackQuery
-            chat_id = message.from.id
-
-            puts "CallbackQuery ID #{message.id}: #{message.data}"
-            state = retrieve_chat_state(bot, chat_id)
-            state.handle_callback(message)
-            store_chat_state(chat_id, state.next_state)
-          end
-        rescue StandardError => e
-          bot.api.send_message(
-            chat_id: message.chat.id,
-            text:
-              "Oops! Seems like we had some issues. I'm going to reboot, sorry!"
-          )
-          puts @chat_state_store
-          raise
-        end
+        handle_message(bot, message)
 
         # TODO: remove
         puts @chat_state_store
