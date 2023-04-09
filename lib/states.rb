@@ -2,17 +2,46 @@ class BaseState
   attr_reader :next_state
 
   def self.enter(bot, **kwargs)
-    new(bot, **kwargs).tap { |state| state.welcome }
+    init_from_data(bot, **kwargs).tap { |state| state.welcome }
   end
 
   def self.init_from_data(bot, **data)
-    new(bot, **data)
+    deserialized_data = data.dup
+    if deserialized_data.dig(:destination, :coordinate_group)
+      deserialized_data[:destination][
+        :coordinate_group
+      ] = Parkcheep::CoordinateGroup.new(
+        **data[:destination][:coordinate_group]
+      )
+    end
+    if deserialized_data[:start_time]
+      deserialized_data[:start_time] = Time.zone.parse(data[:start_time])
+      deserialized_data[:end_time] = Time.zone.parse(data[:end_time])
+    end
+    if deserialized_data[:location_results]
+      deserialized_data[:location_results] = data[
+        :location_results
+      ].map do |result_hash|
+        {
+          address: result_hash[:address],
+          coordinate_group:
+            Parkcheep::CoordinateGroup.new(**result_hash[:coordinate_group])
+        }
+      end
+    end
+
+    new(bot, **deserialized_data)
   end
 
   def initialize(bot, **kwargs)
     @bot = bot
     @next_state = self
     @chat_id = kwargs[:chat_id]
+    @search_query = kwargs[:search_query]
+    @location_results = kwargs[:location_results] || []
+    @destination = kwargs[:destination] || { coordinate_group: nil }
+    @start_time = kwargs[:start_time] || Time.current + 30.minutes
+    @end_time = kwargs[:end_time] || @start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
   end
 
   def handle(message)
@@ -24,7 +53,24 @@ class BaseState
   end
 
   def to_data
-    { state: self.class.name, chat_id: @chat_id }
+    {
+      state: self.class.name,
+      chat_id: @chat_id,
+      search_query: @search_query,
+      location_results:
+        @location_results.map do |result|
+          {
+            address: result[:address],
+            coordinate_group: result[:coordinate_group]&.as_json&.symbolize_keys
+          }
+        end,
+      destination: {
+        coordinate_group:
+          @destination[:coordinate_group]&.as_json&.symbolize_keys
+      },
+      start_time: @start_time&.iso8601,
+      end_time: @end_time&.iso8601
+    }
   end
 
   def welcome
@@ -60,27 +106,6 @@ class BaseState
 end
 
 class SearchState < BaseState
-  def self.init_from_data(bot, **data)
-    deserialized_data = data.dup
-    deserialized_data[:location_results] = data[
-      :location_results
-    ].map do |result_hash|
-      {
-        address: result_hash[:address],
-        coordinate_group:
-          Parkcheep::CoordinateGroup.new(**result_hash[:coordinate_group])
-      }
-    end
-    super(bot, **deserialized_data)
-  end
-
-  def initialize(bot, **kwargs)
-    @search_query = kwargs[:search_query]
-    @location_results = kwargs[:location_results] || []
-
-    super
-  end
-
   def handle(message)
     @search_query = message.text
     @bot.api.send_message(
@@ -130,27 +155,11 @@ class SearchState < BaseState
       return
     end
 
-    @next_state =
-      SelectTimeState.enter(
-        @bot,
-        chat_id: @chat_id,
-        destination: @location_results.first[:coordinate_group]
-      )
-  end
-
-  def to_data
-    {
-      state: self.class.name,
-      chat_id: @chat_id,
-      search_query: @search_query,
-      location_results:
-        @location_results.map do |result|
-          {
-            address: result[:address],
-            coordinate_group: result[:coordinate_group].as_json.symbolize_keys
-          }
-        end
+    @destination = {
+      coordinate_group: @location_results.first[:coordinate_group]
     }
+
+    @next_state = SelectTimeState.enter(@bot, **to_data)
   end
 
   def welcome
@@ -164,24 +173,6 @@ class SearchState < BaseState
 end
 
 class SelectTimeState < BaseState
-  def self.init_from_data(bot, **data)
-    deserialized_data = data.dup
-    deserialized_data[:destination] = Parkcheep::CoordinateGroup.new(
-      **data[:destination][:coordinate_group]
-    )
-    deserialized_data[:start_time] = Time.zone.parse(data[:start_time])
-    deserialized_data[:end_time] = Time.zone.parse(data[:end_time])
-    super(bot, **deserialized_data)
-  end
-
-  def initialize(bot, **kwargs)
-    @destination = kwargs[:destination]
-    @start_time = Time.current + 30.minutes
-    @end_time = start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
-
-    super
-  end
-
   def welcome
     kb = [
       Telegram::Bot::Types::InlineKeyboardButton.new(
@@ -204,14 +195,7 @@ class SelectTimeState < BaseState
 
   def handle_callback(callback_query)
     if callback_query.data == "yes"
-      @next_state =
-        ShowCarparksState.enter(
-          @bot,
-          chat_id: @chat_id,
-          destination: @destination,
-          start_time: @start_time,
-          end_time: @end_time
-        )
+      @next_state = ShowCarparksState.enter(@bot, **to_data)
     else
       @bot.api.send_message(
         chat_id: @chat_id,
@@ -236,48 +220,18 @@ class SelectTimeState < BaseState
     end
   end
 
-  def to_data
-    {
-      state: self.class.name,
-      chat_id: @chat_id,
-      destination: {
-        coordinate_group: @destination.coordinate_group.as_json.symbolize_keys
-      },
-      start_time: start_time.iso8601,
-      end_time: end_time.iso8601
-    }
-  end
-
   private
 
   attr_reader :start_time, :end_time
 end
 
 class ShowCarparksState < BaseState
-  def self.init_from_data(bot, **data)
-    deserialized_data = data.dup
-    deserialized_data[:destination] = Parkcheep::CoordinateGroup.new(
-      **data[:destination][:coordinate_group]
-    )
-    deserialized_data[:start_time] = Time.zone.parse(data[:start_time])
-    deserialized_data[:end_time] = Time.zone.parse(data[:end_time])
-    super(bot, **deserialized_data)
-  end
-
-  def initialize(bot, **kwargs)
-    @destination = kwargs[:destination]
-    @start_time = kwargs[:start_time]
-    @end_time = kwargs[:end_time]
-
-    super
-  end
-
   def welcome
     carpark_results =
       Parkcheep::Carpark
-        .search(destination: @destination) do |carpark_result|
-          carpark_result.distance_from_destination < 1
-        end
+        .search(
+          destination: @destination[:coordinate_group]
+        ) { |carpark_result| carpark_result.distance_from_destination < 1 }
         .first(5)
 
     @bot.api.send_message(
@@ -288,7 +242,7 @@ class ShowCarparksState < BaseState
       chat_id: @chat_id,
       photo:
         gmaps_static_url(
-          destination: @destination,
+          destination: @destination[:coordinate_group],
           carparks: carpark_results.map(&:carpark)
         )
     )
@@ -319,18 +273,6 @@ class ShowCarparksState < BaseState
 
       @bot.api.send_message(chat_id: @chat_id, text:, parse_mode: "MarkdownV2")
     end
-  end
-
-  def to_data
-    {
-      state: self.class.name,
-      chat_id: @chat_id,
-      destination: {
-        coordinate_group: @destination.coordinate_group.as_json.symbolize_keys
-      },
-      start_time: start_time.iso8601,
-      end_time: end_time.iso8601
-    }
   end
 
   private
