@@ -40,7 +40,7 @@ class BotRunner
       end
     rescue StandardError => e
       bot.api.send_message(
-        chat_id: message.chat.id,
+        chat_id:,
         text: "Oops! Seems like we had some issues. I'm going to reboot, sorry!"
       )
       puts @chat_state_store
