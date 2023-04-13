@@ -16,6 +16,7 @@ RSpec.describe BotRunner do
       api = double("api", send_message: nil)
       bot = double("bot", api:)
 
+      # TODO: need to redo the tests
       # start
       message = Telegram::Bot::Types::Message.new(text: "/start")
       allow(message).to receive(:chat).and_return(double("chat", id: 1))
@@ -29,7 +30,9 @@ RSpec.describe BotRunner do
       expect(runner.send(:retrieve_chat_state, bot, 1)).to be_a(SearchState)
 
       # searching, no location found
-      expect_any_instance_of(Parkcheep::Geocoder).to receive(:geocode).with("changi airport").and_return([])
+      expect_any_instance_of(Parkcheep::Geocoder).to receive(:geocode).with(
+        "changi airport"
+      ).and_return([])
       expect(api).to receive(:send_message).with(
         { chat_id: 1, text: "Searching for \"changi airport, Singapore\"..." }
       ).ordered

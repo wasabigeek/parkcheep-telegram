@@ -105,6 +105,131 @@ class BaseState
   end
 end
 
+class NaturalSearchState < BaseState
+  REGEX =
+    /(?<destination>.+) at ?(?<starts_at>(?>\d{4}-\d{2}-\d{2} )?(?>\d{2}:\d{2}))?(?> to (?<ends_at>(?>\d{4}-\d{2}-\d{2} )?(?>\d{2}:\d{2})))?|(?<destination_all>.+)/.freeze
+  HELP_TEXT = <<~HELP
+    - `[destination]` e.g. Orchard Road
+    - `[destination] at [HH:MM]` e.g. Orchard Road at 13:30
+    - `[destination] at [HH:MM] to [HH:MM]` e.g. Orchard Road at 13:30 to 15:00
+    - `[destination] at [YYYY-MM-DD HH:MM]` e.g. Orchard Road at 2023-04-01 13:30
+  HELP
+
+  def welcome
+    @bot.api.send_message(chat_id: @chat_id, text: <<~WELCOME)
+      👋 Where are you going? Type something like the following and I'll help find nearby carparks:
+      #{HELP_TEXT}
+    WELCOME
+  end
+
+  def handle(message)
+    raw_text = message.text
+    match_data = REGEX.match(raw_text)
+    if match_data.nil?
+      @bot.api.send_message(
+        chat_id: message.chat.id,
+        text:
+          "Sorry, I didn't understand! Please type something like:\n#{HELP_TEXT}"
+      )
+    end
+
+    @search_query = match_data[:destination_all] || match_data[:destination]
+    @start_time =
+      (
+        if match_data[:starts_at]
+          Time.zone.parse(match_data[:starts_at])
+        else
+          Time.current + 30.minutes
+        end
+      )
+    @end_time =
+      (
+        if match_data[:ends_at]
+          Time.zone.parse(match_data[:ends_at])
+        else
+          @start_time + 1.hour
+        end
+      )
+
+    @bot.api.send_message(
+      chat_id: message.chat.id,
+      text:
+        "Searching for \"#{@search_query}, Singapore\" at #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}..."
+    )
+
+    @next_state = ShowSearchDataState.enter(@bot, **to_data)
+  end
+end
+
+class ShowSearchDataState < BaseState
+  def welcome
+    # FIXME: ugh, should be able to look at destination, but defaults to a hash with coordinate group, and doesn't have address
+    if @location_results.present?
+      @bot.api.send_message(
+        chat_id: @chat_id,
+        text:
+          "Got it, you're going to \"#{@location_results.first[:address]}\" from #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}."
+      )
+    else
+      @location_results = Parkcheep::Geocoder.new.geocode(@search_query)
+      if @location_results.empty?
+        @bot.api.send_message(
+          chat_id: @chat_id,
+          text:
+            "Could not find that destination on Google. Please try again with a different destination name!"
+        )
+        return
+      end
+      # TODO: handle Google maps returning multiple locations (rare)
+      center_location = @location_results.first
+      @destination = { coordinate_group: center_location[:coordinate_group] }
+      @bot.api.send_message(
+        chat_id: @chat_id,
+        text: "Found this location: #{center_location[:address]}."
+      )
+      @bot.api.send_photo(
+        chat_id: @chat_id,
+        photo: gmaps_static_url(destination: center_location[:coordinate_group])
+      )
+    end
+
+    kb = [
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "Yes",
+        callback_data: "show_carparks"
+      ),
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "No, my destination is wrong",
+        callback_data: "change_destination"
+      ),
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "No, my time is wrong",
+        callback_data: "change_time"
+      )
+    ]
+    markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text: "Shall I proceed to look for nearby carparks?",
+      reply_markup: markup
+    )
+
+    @next_state = self
+  end
+
+  def handle_callback(callback_query)
+    case callback_query.data
+    when "show_carparks"
+      @next_state = ShowCarparksState.enter(@bot, **to_data)
+    when "change_destination"
+      @next_state = SearchState.enter(@bot, **to_data)
+    when "change_time"
+      @next_state = SelectTimeState.enter(@bot, **to_data)
+    end
+  end
+end
+
 class SearchState < BaseState
   def handle(message)
     @search_query = message.text
@@ -159,7 +284,7 @@ class SearchState < BaseState
       coordinate_group: @location_results.first[:coordinate_group]
     }
 
-    @next_state = SelectTimeState.enter(@bot, **to_data)
+    @next_state = ShowSearchDataState.enter(@bot, **to_data)
   end
 
   def welcome
@@ -167,41 +292,25 @@ class SearchState < BaseState
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "👋 Hello! Please type your destination."
+      text: "OK! Please type your destination again."
     )
   end
 end
 
 class SelectTimeState < BaseState
   def welcome
-    kb = [
-      Telegram::Bot::Types::InlineKeyboardButton.new(
-        text: "Yes",
-        callback_data: "yes"
-      ),
-      Telegram::Bot::Types::InlineKeyboardButton.new(
-        text: "No",
-        callback_data: "no"
-      )
-    ]
-    markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
     @bot.api.send_message(
       chat_id: @chat_id,
       text:
-        "The time period for parking is currently set to #{start_time.to_fs(:short)} to #{end_time.to_fs(:short)}, is this correct?",
-      reply_markup: markup
+        "OK! Please enter a start time in `HH:MM` or `YYYY-MM-DD HH:MM` format (e.g. 13:15, or 2022-11-13 13:15). Changing the duration is not supported yet 🙇‍♂️."
     )
   end
 
   def handle_callback(callback_query)
     if callback_query.data == "yes"
-      @next_state = ShowCarparksState.enter(@bot, **to_data)
+      @next_state = ShowSearchDataState.enter(@bot, **to_data)
     else
-      @bot.api.send_message(
-        chat_id: @chat_id,
-        text:
-          "Please enter a start time in `HH:MM` or `YYYY-MM-DD HH:MM` format (e.g. 13:15, or 2022-11-13 13:15). Changing the duration is not supported yet 🙇‍♂️."
-      )
+      welcome
     end
   end
 
@@ -209,7 +318,25 @@ class SelectTimeState < BaseState
     begin
       @start_time = Time.zone.parse(message.text)
       @end_time = start_time + 1.hour
-      welcome
+
+      kb = [
+        Telegram::Bot::Types::InlineKeyboardButton.new(
+          text: "Yes",
+          callback_data: "yes"
+        ),
+        Telegram::Bot::Types::InlineKeyboardButton.new(
+          text: "No",
+          callback_data: "no"
+        )
+      ]
+      markup =
+        Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+      @bot.api.send_message(
+        chat_id: @chat_id,
+        text:
+          "Got the time as #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}, did I get it right?",
+        reply_markup: markup
+      )
     rescue ArgumentError => e
       puts e
       @bot.api.send_message(
@@ -273,6 +400,11 @@ class ShowCarparksState < BaseState
 
       @bot.api.send_message(chat_id: @chat_id, text:, parse_mode: "MarkdownV2")
     end
+
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text: "To search again, just type /start!"
+    )
   end
 
   private
