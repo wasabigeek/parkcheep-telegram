@@ -1,3 +1,5 @@
+require_relative "chat_state"
+
 class BaseState
   attr_reader :next_state
 

@@ -6,3 +6,4 @@ deploy/telegrambot.env
 deploy/telegrambot.service
 log/capistrano.log
 .byebug_history
+db.sqlite3

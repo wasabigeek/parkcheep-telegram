@@ -6,6 +6,8 @@ gem "parkcheep",
     git: "git@github.com:wasabigeek/parkcheep-prototype.git",
     branch: "main"
 gem "telegram-bot-ruby", "~> 0.23.0"
+gem "activerecord", "~> 7.0"
+gem "sqlite3", "~> 1.6" # note platform dependencies https://github.com/sparklemotion/sqlite3-ruby#native-gems-recommended
 
 group :development do
   gem "capistrano", "~> 3.17", require: false
