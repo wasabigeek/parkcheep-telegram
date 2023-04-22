@@ -5,10 +5,11 @@ require "parkcheep"
 require_relative "states"
 
 class BotRunner
-  def initialize
+  def initialize(logger: Logger.new(STDOUT, progname: "ParkcheepTelegram"))
     @token = ENV["TELEGRAM_TOKEN"] || File.read("telegram_token.txt").strip
     @chat_state_store =
       Hash.new { |_, k| { chat_id: k, state: BaseState.to_s } }
+    @logger = logger
   end
 
   def handle_message(bot, message)
@@ -16,7 +17,7 @@ class BotRunner
     begin
       case message
       when Telegram::Bot::Types::Message
-        puts "#{message.class}"
+        logger.debug("#{message.class}")
         chat_id = message.chat.id
 
         case message.text
@@ -33,7 +34,7 @@ class BotRunner
       when Telegram::Bot::Types::CallbackQuery
         chat_id = message.from.id
 
-        puts "CallbackQuery ID #{message.id}: #{message.data}"
+        logger.debug("CallbackQuery ID #{message.id}: #{message.data}")
         state = retrieve_chat_state(bot, chat_id)
         state.handle_callback(message)
         store_chat_state(chat_id, state.next_state)
@@ -43,16 +44,16 @@ class BotRunner
         chat_id:,
         text: "Oops! Seems like we had some issues. I'm going to reboot, sorry!"
       )
-      puts @chat_state_store
+      logger.error(@chat_state_store)
       raise
     end
   end
 
   def run
-    puts "Preloading Parkcheep..."
+    logger.info("Preloading Parkcheep...")
     Time.zone = "Asia/Singapore"
     Parkcheep.preload
-    puts "Preloaded Parkcheep!"
+    logger.info("Preloaded Parkcheep!")
 
     Telegram::Bot::Client.run(@token) do |bot|
       bot.api.set_my_commands(
@@ -67,13 +68,14 @@ class BotRunner
       bot.listen do |message|
         handle_message(bot, message)
 
-        # TODO: remove
-        puts @chat_state_store
+        logger.debug(@chat_state_store)
       end
     end
   end
 
   private
+
+  attr_reader :logger
 
   def retrieve_chat_state(bot, chat_id)
     data = @chat_state_store[chat_id]
