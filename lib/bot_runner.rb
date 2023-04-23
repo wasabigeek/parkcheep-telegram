@@ -5,8 +5,23 @@ require "parkcheep"
 require "json"
 require_relative "states"
 
+class Parkcheep::Logger
+  def self.create
+    if ENV["GOOGLE_CLOUD_LOGGING"] == "true"
+      require "google/cloud/logging"
+
+      logging = Google::Cloud::Logging.new
+      resource = logging.resource "gce_instance", labels: {}
+
+      logging.logger "parkcheep-telegram", resource
+    else
+      Logger.new(STDOUT, progname: "parkcheep-telegram")
+    end
+  end
+end
+
 class BotRunner
-  def initialize(logger: Logger.new(STDOUT, progname: "ParkcheepTelegram"))
+  def initialize(logger: Parkcheep::Logger.create)
     @token = ENV["TELEGRAM_TOKEN"] || File.read("telegram_token.txt").strip
     @chat_state_store =
       Hash.new { |_, k| { chat_id: k, state: BaseState.to_s } }
