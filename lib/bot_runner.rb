@@ -41,8 +41,6 @@ class BotRunner
           state = NaturalSearchState.enter(bot, chat_id:)
         when "/stop"
           state = BaseState.enter(bot, chat_id:)
-        when "/debug"
-          raise "Example error"
         else
           state = retrieve_chat_state(bot, chat_id)
           state.handle(message)
