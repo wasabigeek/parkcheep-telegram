@@ -41,6 +41,8 @@ class BotRunner
           state = NaturalSearchState.enter(bot, chat_id:)
         when "/stop"
           state = BaseState.enter(bot, chat_id:)
+        when "/dev_test"
+          raise "Example Error"
         else
           state = retrieve_chat_state(bot, chat_id)
           state.handle(message)
@@ -60,8 +62,12 @@ class BotRunner
         chat_id:,
         text: "Oops! Seems like we had some issues. I'm going to reboot, sorry!"
       )
-      logger.error(@chat_state_store)
-      raise
+      logger.error({ chat_state_store: @chat_state_store, chat_id: })
+      logger.error(e)
+      # re-raising can cause an infinite loop if the last message can cause the error again.
+      # I think if the Telegram client is interrupted, when it next restarts it will pull the same message again.
+      state = BaseState.enter(bot, chat_id:)
+      store_chat_state(chat_id, state.next_state)
     end
   end
 
@@ -84,7 +90,7 @@ class BotRunner
       bot.listen do |message|
         handle_message(bot, message)
 
-        logger.debug(@chat_state_store)
+        logger.debug({ chat_state_store: @chat_state_store })
       end
     end
   end
