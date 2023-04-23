@@ -25,6 +25,12 @@ class BotRunner
           state = NaturalSearchState.enter(bot, chat_id:)
         when "/stop"
           state = BaseState.enter(bot, chat_id:)
+        when "/debug"
+          logger.debug("PRIORITY=7 Test setting priority")
+          logger.debug(
+            { severity: "debug", message: "Test debug message" }.to_json
+          )
+          state = BaseState.enter(bot, chat_id:)
         else
           state = retrieve_chat_state(bot, chat_id)
           state.handle(message)
