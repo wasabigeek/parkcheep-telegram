@@ -42,13 +42,7 @@ class BotRunner
         when "/stop"
           state = BaseState.enter(bot, chat_id:)
         when "/debug"
-          puts "PRIORITY=7 Test setting priority"
-          puts({ severity: "debug", message: "Test debug message" }.to_json)
-          logger.debug("PRIORITY=7 Test setting priority")
-          logger.debug(
-            { severity: "debug", message: "Test debug message" }.to_json
-          )
-          state = BaseState.enter(bot, chat_id:)
+          raise "Example error"
         else
           state = retrieve_chat_state(bot, chat_id)
           state.handle(message)
