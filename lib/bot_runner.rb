@@ -2,6 +2,7 @@ require "telegram/bot"
 require "active_support/hash_with_indifferent_access"
 require "active_support/time"
 require "parkcheep"
+require "json"
 require_relative "states"
 
 class BotRunner
@@ -27,7 +28,7 @@ class BotRunner
           state = BaseState.enter(bot, chat_id:)
         when "/debug"
           puts "PRIORITY=7 Test setting priority"
-          puts { severity: "debug", message: "Test debug message" }.to_json
+          puts({ severity: "debug", message: "Test debug message" }.to_json)
           logger.debug("PRIORITY=7 Test setting priority")
           logger.debug(
             { severity: "debug", message: "Test debug message" }.to_json
