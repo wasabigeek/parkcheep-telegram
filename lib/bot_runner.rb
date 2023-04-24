@@ -3,13 +3,16 @@ require "active_support/hash_with_indifferent_access"
 require "active_support/time"
 require "parkcheep"
 require "json"
+if ENV["GOOGLE_CLOUD_LOGGING"] == "true"
+  require "google/cloud/logging"
+  require "google/cloud/error_reporting"
+end
+
 require_relative "states"
 
 class Parkcheep::Logger
   def self.create
     if ENV["GOOGLE_CLOUD_LOGGING"] == "true"
-      require "google/cloud/logging"
-
       logging = Google::Cloud::Logging.new
       resource = logging.resource "gce_instance", labels: {}
 
@@ -20,12 +23,27 @@ class Parkcheep::Logger
   end
 end
 
+class Parkcheep::ErrorReporter
+  def initialize(logger:)
+    @logger = logger
+  end
+
+  def report(error)
+    if ENV["GOOGLE_CLOUD_LOGGING"] == "true"
+      Google::Cloud::ErrorReporting.report error
+    else
+      @logger.error(error)
+    end
+  end
+end
+
 class BotRunner
   def initialize(logger: Parkcheep::Logger.create)
     @token = ENV["TELEGRAM_TOKEN"] || File.read("telegram_token.txt").strip
     @chat_state_store =
       Hash.new { |_, k| { chat_id: k, state: BaseState.to_s } }
     @logger = logger
+    @error_reporter = Parkcheep::ErrorReporter.new(logger:)
   end
 
   def handle_message(bot, message)
@@ -62,10 +80,10 @@ class BotRunner
         chat_id:,
         text: "Oops! Seems like we had some issues. I'm going to reboot, sorry!"
       )
-      logger.error({ chat_state_store: @chat_state_store, chat_id: })
-      logger.error(e)
+      logger.debug({ chat_state_data: @chat_state_store[chat_id] })
       # re-raising can cause an infinite loop if the last message can cause the error again.
       # I think if the Telegram client is interrupted, when it next restarts it will pull the same message again.
+      error_reporter.report(e)
       state = BaseState.enter(bot, chat_id:)
       store_chat_state(chat_id, state.next_state)
     end
@@ -97,7 +115,7 @@ class BotRunner
 
   private
 
-  attr_reader :logger
+  attr_reader :logger, :error_reporter
 
   def retrieve_chat_state(bot, chat_id)
     data = @chat_state_store[chat_id]
