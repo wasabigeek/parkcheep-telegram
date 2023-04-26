@@ -75,6 +75,8 @@ class BotRunner
         state.handle_callback(message)
         store_chat_state(chat_id, state.next_state)
       end
+
+      logger.debug({ chat_state_data: @chat_state_store[chat_id] })
     rescue StandardError => e
       bot.api.send_message(
         chat_id:,
@@ -105,11 +107,7 @@ class BotRunner
         ]
       )
 
-      bot.listen do |message|
-        handle_message(bot, message)
-
-        logger.debug({ chat_state_store: @chat_state_store })
-      end
+      bot.listen { |message| handle_message(bot, message) }
     end
   end
 
