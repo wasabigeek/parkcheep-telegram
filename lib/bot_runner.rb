@@ -59,6 +59,9 @@ class BotRunner
           state = NaturalSearchState.enter(bot, chat_id:)
         when "/stop"
           state = BaseState.enter(bot, chat_id:)
+        when "/feedback"
+          current_state = retrieve_chat_state(bot, chat_id)
+          state = FeedbackState.enter(bot, **current_state.to_data)
         when "/dev_test"
           raise "Example Error"
         else
@@ -102,7 +105,11 @@ class BotRunner
         commands: [
           Telegram::Bot::Types::BotCommand.new(
             command: "start",
-            description: "Start finding carparks at your destination"
+            description: "Find carparks near your destination 🚗"
+          ),
+          Telegram::Bot::Types::BotCommand.new(
+            command: "feedback",
+            description: "Help us improve Parkcheep! 🙏"
           )
         ]
       )

@@ -42,6 +42,7 @@ class BaseState
     @destination = kwargs[:destination] || { coordinate_group: nil }
     @start_time = kwargs[:start_time] || Time.current + 30.minutes
     @end_time = kwargs[:end_time] || @start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
+    @feedback = kwargs[:feedback] || {}
   end
 
   def handle(message)
@@ -69,7 +70,8 @@ class BaseState
           @destination[:coordinate_group]&.as_json&.symbolize_keys
       },
       start_time: @start_time&.iso8601,
-      end_time: @end_time&.iso8601
+      end_time: @end_time&.iso8601,
+      feedback: @feedback
     }
   end
 
@@ -403,11 +405,93 @@ class ShowCarparksState < BaseState
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "To search again, just type /start!"
+      text:
+        "To search again, just type /start, or let us know if you have /feedback!"
     )
   end
 
   private
 
   attr_reader :start_time, :end_time
+end
+
+class FeedbackState < BaseState
+  TYPE_WRONG_CARPARK_DATA = "wrong_carpark_data"
+  TYPE_OTHER = "other"
+
+  def welcome
+    kb = [
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "Wrong Carpark Data",
+        callback_data: "wrong_carpark_data"
+      ),
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "Other",
+        callback_data: "other"
+      )
+    ]
+    markup = Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text: "What type of feedback would you like to give?",
+      reply_markup: markup
+    )
+  end
+
+  def handle_callback(callback_query)
+    feedback_type = callback_query.data
+    @feedback[:type] = feedback_type
+
+    case feedback_type
+    when "wrong_carpark_data"
+      @bot.api.send_message(
+        chat_id: @chat_id,
+        text: "Which carpark had the wrong data, and what was wrong?"
+      )
+    else
+      @bot.api.send_message(
+        chat_id: @chat_id,
+        text: "Sure! What would you like to feedback?"
+      )
+    end
+  end
+
+  def handle(message)
+    if feedback_type.nil?
+      @bot.api.send_message(
+        chat_id: @chat_id,
+        text:
+          "Sorry, I'm not a super smart bot (yet) - please select a feedback type from above first!"
+      )
+      return
+    end
+
+    @feedback[:message] = message.text
+
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text:
+        "🙇‍♂️ Thanks so much for the feedback! I'll pass it on to the team. To search again, just type /start!"
+    )
+    @bot.api.send_message(
+      chat_id: ENV["FEEDBACK_CHAT_ID"],
+      text: "Feedback received:\n#{to_data}"
+    )
+  end
+
+  private
+
+  def feedback_type
+    return unless @feedback.is_a?(Hash)
+
+    case @feedback[:type]
+    when "wrong_carpark_data"
+      TYPE_WRONG_CARPARK_DATA
+    when "other"
+      TYPE_OTHER
+    else
+      nil
+    end
+  end
 end
