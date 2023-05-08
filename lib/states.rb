@@ -377,17 +377,24 @@ class ShowCarparksState < BaseState
     )
     labels = %w[A B C D E F G H I J]
     carpark_results.each_with_index do |result, index|
-      estimated_cost = result.carpark.cost(start_time, end_time)
-      estimated_cost_text =
-        estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)}"
       text =
         "#{labels[index]}: #{result.name}\n- Distance: #{result.distance_from_destination.truncate(2)} km"
-      text += "\n- Estimated Cost: #{estimated_cost_text}"
+
+      begin
+        estimated_cost = result.carpark.cost(start_time, end_time)
+
+        estimated_cost_text =
+        estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)}"
+        text += "\n- Estimated Cost: #{estimated_cost_text}"
+      rescue Parkcheep::InvalidDateRangeError => e
+        # TODO: log or report error
+        estimated_cost = nil
+      end
 
       parking_rate_text = result.carpark.cost_text(start_time, end_time)
       text +=
-        "\n- Raw Parking Rates: #{parking_rate_text}" if parking_rate_text.present? &&
-        estimated_cost.nil?
+      "\n- Raw Parking Rates: #{parking_rate_text}" if parking_rate_text.present? &&
+      estimated_cost.nil?
 
       coord = result.carpark.coordinate_group
       # $gmaps$ is a workaround to not escape inline url

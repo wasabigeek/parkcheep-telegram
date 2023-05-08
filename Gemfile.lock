@@ -1,6 +1,6 @@
 GIT
   remote: git@github.com:wasabigeek/parkcheep-prototype.git
-  revision: 5d6c3f3dce95edf976b81bd2071b14b50fd188e5
+  revision: 71ba9a50ddf76900d6b08342021b4409cf4b511c
   branch: main
   specs:
     parkcheep (0.1.0)
