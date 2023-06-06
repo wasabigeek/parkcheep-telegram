@@ -119,7 +119,7 @@ class NaturalSearchState < BaseState
 
   def welcome
     @bot.api.send_message(chat_id: @chat_id, text: <<~WELCOME)
-      👋 Where are you going? Type something like the following and I'll help find nearby carparks:
+      👋 Where in Singapore are you going? Type something like this and I'll help find nearby carparks:
       #{HELP_TEXT}
     WELCOME
   end
@@ -156,7 +156,7 @@ class NaturalSearchState < BaseState
     @bot.api.send_message(
       chat_id: message.chat.id,
       text:
-        "Searching for \"#{@search_query}, Singapore\" at #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}..."
+        "Searching for \"#{@search_query}, Singapore\"..."
     )
 
     @next_state = ShowSearchDataState.enter(@bot, **to_data)
@@ -170,7 +170,7 @@ class ShowSearchDataState < BaseState
       @bot.api.send_message(
         chat_id: @chat_id,
         text:
-          "Got it, you're going to \"#{@location_results.first[:address]}\" from #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}."
+          "Got it, so find parking around \"#{@location_results.first[:address]}\" from #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}?"
       )
     else
       @location_results = Parkcheep::Geocoder.new.geocode(@search_query)
@@ -213,7 +213,7 @@ class ShowSearchDataState < BaseState
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "Shall I proceed to look for nearby carparks?",
+      text: "Shall I proceed to look for carparks nearby, for the time period #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}?",
       reply_markup: markup
     )
 
@@ -413,7 +413,7 @@ class ShowCarparksState < BaseState
     @bot.api.send_message(
       chat_id: @chat_id,
       text:
-        "To search again, just type /start, or let us know if you have /feedback!"
+        "Type /start for a new search. Type /feedback if you spot an error or have a suggestion!"
     )
   end
 
