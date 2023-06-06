@@ -1,6 +1,7 @@
 class BaseState
   attr_reader :next_state
 
+
   def self.enter(bot, **kwargs)
     init_from_data(bot, **kwargs).tap { |state| state.welcome }
   end
@@ -133,6 +134,7 @@ class NaturalSearchState < BaseState
         text:
           "Sorry, I didn't understand! Please type something like:\n#{HELP_TEXT}"
       )
+      return
     end
 
     @search_query = match_data[:destination_all] || match_data[:destination]
@@ -165,14 +167,9 @@ end
 
 class ShowSearchDataState < BaseState
   def welcome
+    # this conditional is to handle coming from SelectTimeState
     # FIXME: ugh, should be able to look at destination, but defaults to a hash with coordinate group, and doesn't have address
-    if @location_results.present?
-      @bot.api.send_message(
-        chat_id: @chat_id,
-        text:
-          "Got it, so find parking around \"#{@location_results.first[:address]}\" from #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}?"
-      )
-    else
+    unless @location_results.present?
       @location_results = Parkcheep::Geocoder.new.geocode(@search_query)
       if @location_results.empty?
         @bot.api.send_message(
@@ -300,11 +297,19 @@ class SearchState < BaseState
 end
 
 class SelectTimeState < BaseState
+  REGEX =
+  /(?<starts_at>(?>\d{4}-\d{2}-\d{2} )?(?>\d{2}:\d{2}))?(?> to (?<ends_at>(?>\d{4}-\d{2}-\d{2} )?(?>\d{2}:\d{2})))?/.freeze
+  HELP_TEXT = <<~HELP
+    - `[HH:MM]` e.g. 13:30
+    - `[HH:MM] to [HH:MM]` e.g. 13:30 to 15:00
+    - `[YYYY-MM-DD HH:MM]` e.g. 2023-04-01 13:30
+  HELP
+
   def welcome
     @bot.api.send_message(
       chat_id: @chat_id,
       text:
-        "OK! Please enter a start time in `HH:MM` or `YYYY-MM-DD HH:MM` format (e.g. 13:15, or 2022-11-13 13:15). Changing the duration is not supported yet 🙇‍♂️."
+        "OK! Please enter the time period in one of the following formats:\n#{HELP_TEXT}"
     )
   end
 
@@ -317,36 +322,52 @@ class SelectTimeState < BaseState
   end
 
   def handle(message)
-    begin
-      @start_time = Time.zone.parse(message.text)
-      @end_time = start_time + 1.hour
-
-      kb = [
-        Telegram::Bot::Types::InlineKeyboardButton.new(
-          text: "Yes",
-          callback_data: "yes"
-        ),
-        Telegram::Bot::Types::InlineKeyboardButton.new(
-          text: "No",
-          callback_data: "no"
-        )
-      ]
-      markup =
-        Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-      @bot.api.send_message(
-        chat_id: @chat_id,
-        text:
-          "Got the time as #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}, did I get it right?",
-        reply_markup: markup
-      )
-    rescue ArgumentError => e
-      puts e
+    raw_text = message.text
+    match_data = REGEX.match(raw_text)
+    if match_data[:starts_at].nil?
       @bot.api.send_message(
         chat_id: message.chat.id,
         text:
-          "Could not parse \"#{message.text}\", please try again in HH:MM format."
+          "Sorry, I didn't understand! Please type in one of the following formats:\n#{HELP_TEXT}"
       )
+      return
     end
+
+    @start_time =
+      (
+        if match_data[:starts_at]
+          Time.zone.parse(match_data[:starts_at])
+        else
+          Time.current + 30.minutes
+        end
+      )
+    @end_time =
+      (
+        if match_data[:ends_at]
+          Time.zone.parse(match_data[:ends_at])
+        else
+          @start_time + 1.hour
+        end
+      )
+
+    kb = [
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "Yes",
+        callback_data: "yes"
+      ),
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "No",
+        callback_data: "no"
+      )
+    ]
+    markup =
+      Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text:
+        "Got the time as #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}, did I get it right?",
+      reply_markup: markup
+    )
   end
 
   private
