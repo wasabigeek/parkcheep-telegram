@@ -171,6 +171,7 @@ class ShowSearchDataState < BaseState
     # FIXME: ugh, should be able to look at destination, but defaults to a hash with coordinate group, and doesn't have address
     unless @location_results.present?
       @location_results = Parkcheep::Geocoder.new.geocode(@search_query)
+      # this is a dead end, but Google seems to always at return something
       if @location_results.empty?
         @bot.api.send_message(
           chat_id: @chat_id,
@@ -241,7 +242,7 @@ class SearchState < BaseState
     if @location_results.empty?
       @bot.api.send_message(
         chat_id: message.chat.id,
-        text: "No locations found."
+        text: "Could not find that destination on Google. Please try again with a different destination name!"
       )
       return
     end
