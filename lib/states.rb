@@ -404,9 +404,10 @@ class ShowCarparksState < BaseState
 
       begin
         estimated_cost = result.carpark.cost(start_time, end_time)
+        estimated_cost_extended = result.carpark.cost(start_time, end_time + 1.hour)
 
         estimated_cost_text =
-        estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)}"
+        estimated_cost.nil? ? "N/A" : "$#{estimated_cost.truncate(2)} (+1 hour: $#{estimated_cost_extended.truncate(2)} total)"
         text += "\n- Estimated Cost: #{estimated_cost_text}"
       rescue Parkcheep::InvalidDateRangeError => e
         # TODO: log or report error
