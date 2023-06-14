@@ -419,18 +419,24 @@ class ShowCarparksState < BaseState
       "\n- Raw Parking Rates: #{parking_rate_text}" if parking_rate_text.present? &&
       estimated_cost.nil?
 
-      coord = result.carpark.coordinate_group
-      # $gmaps$ is a workaround to not escape inline url
-      text +=
-        "\n- $gmaps$https://www.google.com/maps/dir/?api=1&destination=#{[coord.latitude, coord.longitude].join(",")}$gmaps$"
-
       # escape Telegram markdown reserved characters https://core.telegram.org/bots/api#formatting-options
       text.gsub!(
         /(\_|\*|\~|\`|\>|\#|\+|\-|\=|\||\{|\}|\.|\!|\[|\]|\(|\))/
-      ) { |match| "\\#{match}" }
-      text.gsub!(/\$gmaps\$(\S+)\$gmaps\$/, "[Google Maps Directions](\\1)")
+        ) { |match| "\\#{match}" }
 
-      @bot.api.send_message(chat_id: @chat_id, text:, parse_mode: "MarkdownV2")
+      coord = result.carpark.coordinate_group
+      kb = [
+        Telegram::Bot::Types::InlineKeyboardButton.new(
+          text: "Google Maps Directions",
+          url: "https://www.google.com/maps/dir/?api=1&destination=#{[coord.latitude, coord.longitude].join(",")}"
+        )
+      ]
+      @bot.api.send_message(
+        chat_id: @chat_id,
+        text:,
+        parse_mode: "MarkdownV2",
+        reply_markup: Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+      )
     end
 
     @bot.api.send_message(
