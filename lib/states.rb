@@ -429,8 +429,14 @@ class ShowCarparksState < BaseState
         Telegram::Bot::Types::InlineKeyboardButton.new(
           text: "Google Maps Directions",
           url: "https://www.google.com/maps/dir/?api=1&destination=#{[coord.latitude, coord.longitude].join(",")}"
-        )
+        ),
       ]
+      if result.carpark.source.present?
+        kb << Telegram::Bot::Types::InlineKeyboardButton.new(
+          text: "View Rates",
+          url: result.carpark.source.url
+        )
+      end
       @bot.api.send_message(
         chat_id: @chat_id,
         text:,
