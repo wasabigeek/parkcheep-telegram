@@ -388,6 +388,10 @@ class ShowCarparksState < BaseState
     when "show_more_carparks"
       @carpark_results_index = @carpark_results_index + 5
       show_results
+    when "/start"
+      @next_state = NaturalSearchState.enter(@bot, chat_id: @chat_id)
+    when "/feedback"
+      @next_state = FeedbackState.enter(@bot, chat_id: @chat_id)
     end
   end
 
@@ -468,20 +472,22 @@ class ShowCarparksState < BaseState
 
     kb = [
       Telegram::Bot::Types::InlineKeyboardButton.new(
-        text: "Show next 5 carparks",
+        text: "⏭️ Show next 5 carparks",
         callback_data: "show_more_carparks"
+      ),
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "🚗 Start a new search",
+        callback_data: "/start"
+      ),
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "🙏 Send some feedback",
+        callback_data: "/feedback"
       ),
     ]
     @bot.api.send_message(
       chat_id: @chat_id,
       text: "What would you like to do next?",
       reply_markup: Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
-    )
-
-    @bot.api.send_message(
-      chat_id: @chat_id,
-      text:
-        "Type /start for a new search. Type /feedback if you spot an error or have a suggestion!"
     )
   end
 end
