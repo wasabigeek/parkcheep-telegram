@@ -44,6 +44,7 @@ class BaseState
     @start_time = kwargs[:start_time] || Time.current + 30.minutes
     @end_time = kwargs[:end_time] || @start_time + 1.hour # note: time helpers are from Parkcheep gem, may want to encapsulate
     @feedback = kwargs[:feedback] || {}
+    @carpark_results_index = kwargs[:carpark_results_index] || 0
   end
 
   def handle(message)
@@ -72,7 +73,8 @@ class BaseState
       },
       start_time: @start_time&.iso8601,
       end_time: @end_time&.iso8601,
-      feedback: @feedback
+      feedback: @feedback,
+      carpark_results_index: @carpark_results_index
     }
   end
 
@@ -378,16 +380,34 @@ end
 
 class ShowCarparksState < BaseState
   def welcome
+    show_results
+  end
+
+  def handle_callback(callback_query)
+    case callback_query.data
+    when "show_more_carparks"
+      @carpark_results_index = @carpark_results_index + 5
+      show_results
+    end
+  end
+
+  private
+
+  attr_reader :start_time, :end_time
+
+  def show_results
+    @carpark_results_index ||= 0
     carpark_results =
       Parkcheep::Carpark
         .search(
           destination: @destination[:coordinate_group]
-        ) { |carpark_result| carpark_result.distance_from_destination < 1 }
-        .first(5)
+        ) do |carpark_result|
+          carpark_result.distance_from_destination < 1
+        end[@carpark_results_index..@carpark_results_index + 4]
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "Showing nearest #{carpark_results.size} carparks in yellow 🟡:"
+      text: "Showing #{@carpark_results_index > 0 ? "next" : "first"} #{carpark_results.size} carparks within 1 km in yellow 🟡:"
     )
     @bot.api.send_photo(
       chat_id: @chat_id,
@@ -445,16 +465,25 @@ class ShowCarparksState < BaseState
       )
     end
 
+
+    kb = [
+      Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "Show next 5 carparks",
+        callback_data: "show_more_carparks"
+      ),
+    ]
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text: "What would you like to do next?",
+      reply_markup: Telegram::Bot::Types::InlineKeyboardMarkup.new(inline_keyboard: kb)
+    )
+
     @bot.api.send_message(
       chat_id: @chat_id,
       text:
         "Type /start for a new search. Type /feedback if you spot an error or have a suggestion!"
     )
   end
-
-  private
-
-  attr_reader :start_time, :end_time
 end
 
 class FeedbackState < BaseState
