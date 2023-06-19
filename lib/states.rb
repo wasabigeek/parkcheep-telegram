@@ -472,10 +472,6 @@ class ShowCarparksState < BaseState
 
     kb = [
       Telegram::Bot::Types::InlineKeyboardButton.new(
-        text: "⏭️ Show next 5 carparks",
-        callback_data: "show_more_carparks"
-      ),
-      Telegram::Bot::Types::InlineKeyboardButton.new(
         text: "🚗 Start a new search",
         callback_data: "/start"
       ),
@@ -484,6 +480,12 @@ class ShowCarparksState < BaseState
         callback_data: "/feedback"
       ),
     ]
+    unless carpark_results.size < 5
+      kb.unshift(Telegram::Bot::Types::InlineKeyboardButton.new(
+        text: "⏭️ Show next 5 carparks",
+        callback_data: "show_more_carparks"
+      ))
+    end
     @bot.api.send_message(
       chat_id: @chat_id,
       text: "What would you like to do next?",
