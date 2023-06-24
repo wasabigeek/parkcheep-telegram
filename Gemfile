@@ -8,6 +8,7 @@ gem "parkcheep",
 gem "telegram-bot-ruby", "~> 0.23.0"
 gem "google-cloud-logging", "~> 2.3"
 gem "google-cloud-error_reporting", "~> 0.42.2"
+gem "ruby-openai", "~> 4.2"
 
 group :development do
   gem "capistrano", "~> 3.17", require: false

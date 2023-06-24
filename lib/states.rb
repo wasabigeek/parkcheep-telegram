@@ -1,6 +1,8 @@
+require "json"
+require "openai"
+
 class BaseState
   attr_reader :next_state
-
 
   def self.enter(bot, **kwargs)
     init_from_data(bot, **kwargs).tap { |state| state.welcome }
@@ -107,6 +109,77 @@ class BaseState
     url += carpark_markers.join if carpark_markers.any?
 
     url
+  end
+end
+
+class StartStateV2 < BaseState
+  # temp method
+  def self.enabled?(chat_id)
+    chat_id.to_s == ENV["FEEDBACK_CHAT_ID"] && ENV["OPENAI_API_KEY"].present?
+  end
+
+  def welcome
+    @bot.api.send_message(chat_id: @chat_id, text: <<~WELCOME)
+      👋 Hey there! I'm here to help you find nearby carparks. Just let me know your destination and the arrival/departure time e.g. Ngee Ann City, 10am to 12pm.
+    WELCOME
+  end
+
+  def handle(message)
+    @bot.api.send_message(chat_id: @chat_id, text: "🤖 Processing your request...")
+    @search_query, @start_time, @end_time = parse(message.text)
+    @next_state = ShowSearchDataState.enter(@bot, **to_data)
+  end
+
+  private
+
+  def parse(query)
+    query = query.strip
+    return if query.blank?
+
+    client = OpenAI::Client.new(access_token: ENV["OPENAI_API_KEY"])
+    prompt = <<~PROMPT
+      Your task is to figure out where the user's destination, arrival and departure time.
+      For the text delimited by triple backticks:
+        - Extract the destination, assuming it is in Singapore.
+        - If provided, extract the arrival and departure time in ISO8601 format, assuming the time now is #{Time.now.to_s}.
+        - If possible, geocode the destination and get it's latitude and longitude.
+        - Output a json object that contains the following keys: original_text, destination, latitude, longitude, arrival_time, departure_time.
+
+      ```#{query}```
+    PROMPT
+
+    response = client.chat(
+      parameters: {
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          "role": "user",
+          "content": prompt,
+        },
+      ],
+      temperature: 0,
+      max_tokens: 256,
+    })
+    # TODO: log to track accuracy
+    message = response.dig("choices", 0, "message", "content")
+    json_string = message.match(/\{.*\}/m).to_s
+    json_object = JSON.parse(json_string)
+
+    search_query = json_object["destination"]
+    start_time =
+      if json_object["arrival_time"]
+        Time.zone.parse(json_object["arrival_time"])
+      else
+        Time.current + 30.minutes
+      end
+    end_time =
+      if json_object["departure_time"]
+        Time.zone.parse(json_object["departure_time"])
+      else
+        @start_time + 1.hour
+      end
+
+    [search_query, start_time, end_time]
   end
 end
 

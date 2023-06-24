@@ -56,7 +56,11 @@ class BotRunner
 
         case message.text
         when "/start"
-          state = NaturalSearchState.enter(bot, chat_id:)
+          if StartStateV2.enabled?(chat_id)
+            state = StartStateV2.enter(bot, chat_id:)
+          else
+            state = NaturalSearchState.enter(bot, chat_id:)
+          end
         when "/stop"
           state = BaseState.enter(bot, chat_id:)
         when "/feedback"

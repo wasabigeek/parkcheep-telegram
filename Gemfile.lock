@@ -145,6 +145,9 @@ GEM
       rspec-support (~> 3.12.0)
     rspec-support (3.12.0)
     ruby-hmac (0.4.0)
+    ruby-openai (4.2.0)
+      faraday (>= 1)
+      faraday-multipart (>= 1)
     ruby2_keywords (0.0.5)
     signet (0.17.0)
       addressable (~> 2.8)
@@ -182,6 +185,7 @@ DEPENDENCIES
   google-cloud-logging (~> 2.3)
   parkcheep!
   rspec (~> 3.12)
+  ruby-openai (~> 4.2)
   telegram-bot-ruby (~> 0.23.0)
 
 BUNDLED WITH
