@@ -138,12 +138,12 @@ class StartStateV2 < BaseState
 
     client = OpenAI::Client.new(access_token: ENV["OPENAI_API_KEY"])
     prompt = <<~PROMPT
-      Your task is to figure out where the user's destination, arrival and departure time.
-      For the text delimited by triple backticks:
-        - Extract the destination, assuming it is in Singapore.
-        - If provided, extract the arrival and departure time in ISO8601 format, assuming the time now is #{Time.now.to_s}.
-        - If possible, geocode the destination and get it's latitude and longitude.
-        - Output a json object that contains the following keys: original_text, destination, latitude, longitude, arrival_time, departure_time.
+      You are a parking bot. Your task is to figure out the user's destination, start and end time from the text delimited by triple backticks:
+      - Extract the destination, assuming it is in Singapore.
+      - If provided, extract the start time in ISO8601 format, assuming the time now is #{Time.current.to_s}.
+      - If provided, extract the end time in ISO8601 format. Do not guess it.
+      - If possible, geocode the destination and get it's latitude and longitude.
+      - Output a json object that contains the following keys: original_text, destination, latitude, longitude, start_time, end_time.
 
       ```#{query}```
     PROMPT
@@ -167,16 +167,16 @@ class StartStateV2 < BaseState
 
     search_query = json_object["destination"]
     start_time =
-      if json_object["arrival_time"]
-        Time.zone.parse(json_object["arrival_time"])
+      if json_object["start_time"].present?
+        Time.zone.parse(json_object["start_time"])
       else
         Time.current + 30.minutes
       end
     end_time =
-      if json_object["departure_time"]
-        Time.zone.parse(json_object["departure_time"])
+      if json_object["end_time"].present?
+        Time.zone.parse(json_object["end_time"])
       else
-        @start_time + 1.hour
+        start_time + 1.hour
       end
 
     [search_query, start_time, end_time]
