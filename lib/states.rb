@@ -1,5 +1,6 @@
 require "json"
 require "openai"
+require_relative "parkcheep/google_maps"
 
 class BaseState
   attr_reader :next_state
@@ -87,28 +88,6 @@ class BaseState
       chat_id: @chat_id,
       text: "Hello, welcome to the Parkcheep Bot! Type /start to begin."
     )
-  end
-
-  # @param [Parkcheep::CoordinateGroup] destination
-  # @param [Array<Parkcheep::Carpark>] carparks
-  def gmaps_static_url(destination:, carparks: [])
-    center_lat_lng = [destination.latitude, destination.longitude].join(",")
-    url =
-      "https://maps.googleapis.com/maps/api/staticmap?key=" +
-        ENV["GOOGLE_MAPS_API_KEY"] # &signature=#{}
-    url += "&size=500x500"
-    # destination parameters
-    url += "&markers=color:red|#{center_lat_lng}"
-    # carpark parameters
-    carpark_markers =
-      carparks.to_enum.with_index.map do |carpark, index|
-        labels = %w[A B C D E F G H I J]
-        coordinate_group = carpark.coordinate_group
-        "&markers=color:yellow|label:#{labels[index]}|#{coordinate_group.latitude},#{coordinate_group.longitude}"
-      end
-    url += carpark_markers.join if carpark_markers.any?
-
-    url
   end
 end
 
@@ -264,7 +243,7 @@ class ShowSearchDataState < BaseState
       )
       @bot.api.send_photo(
         chat_id: @chat_id,
-        photo: gmaps_static_url(destination: center_location[:coordinate_group])
+        photo: Parkcheep::GoogleMaps.static_url(destination: center_location[:coordinate_group])
       )
     end
 
@@ -326,7 +305,7 @@ class SearchState < BaseState
     center_location = @location_results.first
     @bot.api.send_photo(
       chat_id: message.chat.id,
-      photo: gmaps_static_url(destination: center_location[:coordinate_group])
+      photo: Parkcheep::GoogleMaps.static_url(destination: center_location[:coordinate_group])
     )
     kb = [
       Telegram::Bot::Types::InlineKeyboardButton.new(
@@ -489,7 +468,7 @@ class ShowCarparksState < BaseState
     @bot.api.send_photo(
       chat_id: @chat_id,
       photo:
-        gmaps_static_url(
+        Parkcheep::GoogleMaps.static_url(
           destination: @destination[:coordinate_group],
           carparks: carpark_results.map(&:carpark)
         )
