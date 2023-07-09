@@ -92,19 +92,14 @@ class BaseState
 end
 
 class StartStateV2 < BaseState
-  # temp method
-  def self.enabled?(chat_id)
-    chat_id.to_s == ENV["FEEDBACK_CHAT_ID"] && ENV["OPENAI_API_KEY"].present?
-  end
-
   def welcome
     @bot.api.send_message(chat_id: @chat_id, text: <<~WELCOME)
-      👋 Hey there! I'm here to help you find nearby carparks. Just let me know your destination and the arrival/departure time e.g. Ngee Ann City, 10am to 12pm.
+      👋 Hello! I'm here to help you find cheap, nearby carparks. Type your destination and (optionally) arrival/departure time e.g. "Ngee Ann City, 10am to 12pm".
     WELCOME
   end
 
   def handle(message)
-    @bot.api.send_message(chat_id: @chat_id, text: "🤖 Processing your request...")
+    @bot.api.send_message(chat_id: @chat_id, text: "🤖 Searching on Google Maps...")
     @search_query, @start_time, @end_time = parse(message.text)
     @next_state = ShowSearchDataState.enter(@bot, **to_data)
   end
@@ -162,6 +157,7 @@ class StartStateV2 < BaseState
   end
 end
 
+# TODO: deprecate
 class NaturalSearchState < BaseState
   REGEX =
     /(?<destination>.+) at ?(?<starts_at>(?>\d{4}-\d{2}-\d{2} )?(?>\d{2}:\d{2}))?(?> to (?<ends_at>(?>\d{4}-\d{2}-\d{2} )?(?>\d{2}:\d{2})))?|(?<destination_all>.+)/.freeze
@@ -230,7 +226,7 @@ class ShowSearchDataState < BaseState
         @bot.api.send_message(
           chat_id: @chat_id,
           text:
-            "Could not find that destination on Google. Please try again with a different destination name!"
+            "Could not find that destination on Google Maps. Please try again with a different destination name!"
         )
         return
       end
@@ -257,7 +253,7 @@ class ShowSearchDataState < BaseState
         callback_data: "change_destination"
       ),
       Telegram::Bot::Types::InlineKeyboardButton.new(
-        text: "No, my time is wrong",
+        text: "No, my arrival / departure time is wrong",
         callback_data: "change_time"
       )
     ]
@@ -265,7 +261,7 @@ class ShowSearchDataState < BaseState
 
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "Shall I proceed to look for carparks nearby, for the time period #{@start_time.to_fs(:short)} to #{@end_time.to_fs(:short)}?",
+      text: "I've also got your arrival time as #{@start_time.to_fs(:short)} till #{@end_time.to_fs(:short)}. Is that correct?",
       reply_markup: markup
     )
 
