@@ -437,9 +437,9 @@ class ShowCarparksState < BaseState
       @carpark_results_index = @carpark_results_index + 5
       show_results
     when "/start"
-      @next_state = NaturalSearchState.enter(@bot, chat_id: @chat_id)
+      @next_state = States::SEARCH_ENTRYPOINT.enter(@bot, chat_id: @chat_id)
     when "/feedback"
-      @next_state = FeedbackState.enter(@bot, chat_id: @chat_id)
+      @next_state = States::FEEDBACK_ENTRYPOINT.enter(@bot, chat_id: @chat_id)
     end
   end
 
@@ -621,4 +621,9 @@ class FeedbackState < BaseState
       nil
     end
   end
+end
+
+module States
+  SEARCH_ENTRYPOINT = StartStateV2
+  FEEDBACK_ENTRYPOINT = FeedbackState
 end

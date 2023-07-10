@@ -56,12 +56,10 @@ class BotRunner
 
         case message.text
         when "/start"
-          state = StartStateV2.enter(bot, chat_id:)
-        when "/stop"
-          state = BaseState.enter(bot, chat_id:)
+          state = States::SEARCH_ENTRYPOINT.enter(bot, chat_id:)
         when "/feedback"
           current_state = retrieve_chat_state(bot, chat_id)
-          state = FeedbackState.enter(bot, **current_state.to_data)
+          state = States::FEEDBACK_ENTRYPOINT.enter(bot, **current_state.to_data)
         when "/dev_test"
           raise "Example Error"
         else
@@ -89,7 +87,7 @@ class BotRunner
       # re-raising can cause an infinite loop if the last message can cause the error again.
       # I think if the Telegram client is interrupted, when it next restarts it will pull the same message again.
       error_reporter.report(e)
-      state = BaseState.enter(bot, chat_id:)
+      state = States::SEARCH_ENTRYPOINT.enter(bot, chat_id:)
       store_chat_state(chat_id, state.next_state)
     end
   end
