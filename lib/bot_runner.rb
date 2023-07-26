@@ -9,41 +9,16 @@ if ENV["GOOGLE_CLOUD_LOGGING"] == "true"
 end
 
 require_relative "states"
-
-class Parkcheep::Logger
-  def self.create
-    if ENV["GOOGLE_CLOUD_LOGGING"] == "true"
-      logging = Google::Cloud::Logging.new
-      resource = logging.resource "gce_instance", labels: {}
-
-      logging.logger "parkcheep-telegram", resource
-    else
-      Logger.new(STDOUT, progname: "parkcheep-telegram")
-    end
-  end
-end
-
-class Parkcheep::ErrorReporter
-  def initialize(logger:)
-    @logger = logger
-  end
-
-  def report(error)
-    if ENV["GOOGLE_CLOUD_LOGGING"] == "true"
-      Google::Cloud::ErrorReporting.report error
-    else
-      @logger.error(error)
-    end
-  end
-end
+require_relative "parkcheep/logger"
+require_relative "parkcheep/error_reporter"
 
 class BotRunner
-  def initialize(logger: Parkcheep::Logger.create)
+  def initialize(logger: Parkcheep::Logger.instance)
     @token = ENV["TELEGRAM_TOKEN"] || File.read("telegram_token.txt").strip
     @chat_state_store =
       Hash.new { |_, k| { chat_id: k, state: BaseState.to_s } }
     @logger = logger
-    @error_reporter = Parkcheep::ErrorReporter.new(logger:)
+    @error_reporter = Parkcheep::ErrorReporter.instance
   end
 
   def handle_message(bot, message)
