@@ -52,10 +52,24 @@ class BaseState
 
   def handle(message)
     @next_state = self
+
+    return unless @chat_id.present?
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text: "Oops! I'm not programmed to handle this yet. Is there a button above you can click? If you're looking to start a new search, type /start."
+      # TODO: (In the meantime, I've sent a report to the team!)
+    )
   end
 
   def handle_callback(callback_query)
     @next_state = self
+
+    return unless @chat_id.present?
+    @bot.api.send_message(
+      chat_id: @chat_id,
+      text: "Oops! I'm not programmed to handle this yet. Is there a button above you can click? If you're looking to start a new search, type /start."
+      # TODO: (In the meantime, I've sent a report to the team!)
+    )
   end
 
   def to_data
