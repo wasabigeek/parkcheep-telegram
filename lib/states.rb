@@ -1,6 +1,7 @@
 require "json"
 require "openai"
 require_relative "parkcheep/google_maps"
+require_relative "parkcheep/logger"
 
 class BaseState
   attr_reader :next_state
@@ -56,8 +57,10 @@ class BaseState
     return unless @chat_id.present?
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "Oops! I'm not programmed to handle this yet. Is there a button above you can click? If you're looking to start a new search, type /start."
-      # TODO: (In the meantime, I've sent a report to the team!)
+      text: "Oops! I'm not programmed to handle this yet. Is there a button above you can click? If you're looking to start a new search, type /start. (In the meantime, I've sent a report to the team!)"
+    )
+    Parkcheep::Logger.instance.warn(
+      "Unhandled message in #{self.class.name}: #{message.text}"
     )
   end
 
@@ -67,8 +70,10 @@ class BaseState
     return unless @chat_id.present?
     @bot.api.send_message(
       chat_id: @chat_id,
-      text: "Oops! I'm not programmed to handle this yet. Is there a button above you can click? If you're looking to start a new search, type /start."
-      # TODO: (In the meantime, I've sent a report to the team!)
+      text: "Oops! I'm not programmed to handle this yet. Is there a button above you can click? If you're looking to start a new search, type /start. (In the meantime, I've sent a report to the team!)"
+    )
+    Parkcheep::Logger.instance.warn(
+      "Unhandled callback in #{self.class.name}: #{callback_query.data}"
     )
   end
 
