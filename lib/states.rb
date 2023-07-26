@@ -113,7 +113,7 @@ end
 class StartStateV2 < BaseState
   def welcome
     @bot.api.send_message(chat_id: @chat_id, text: <<~WELCOME)
-      👋 Hello! I'm here to help you find cheap, nearby carparks. Type your destination and (optionally) arrival/departure time e.g. "Ngee Ann City, 10am to 12pm".
+      👋 Hello! I'm here to help you find cheap, nearby carparks. To start, type your destination and (optionally) arrival/departure time e.g. "Ngee Ann City, 10am to 12pm".
     WELCOME
   end
 
