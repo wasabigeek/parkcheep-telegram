@@ -6,3 +6,5 @@ deploy/telegrambot.env
 deploy/telegrambot.service
 log/capistrano.log
 .byebug_history
+deploy/parkcheep-telegram.env
+deploy/parkcheep-telegram.service
