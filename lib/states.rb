@@ -118,8 +118,8 @@ class StartStateV2 < BaseState
   end
 
   def handle(message)
-    @bot.api.send_message(chat_id: @chat_id, text: "🤖 Searching on Google Maps...")
     @search_query, @start_time, @end_time = parse(message.text)
+    @bot.api.send_message(chat_id: @chat_id, text: "🤖 Searching for \"#{@search_query}, Singapore\" on Google Maps...")
     @next_state = ShowSearchDataState.enter(@bot, **to_data)
   end
 
